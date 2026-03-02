@@ -127,6 +127,45 @@ describe("provider keep strategy", () => {
     expect(text).toContain("\"openai-responses\"");
   });
 
+  it("writeModelConfig persists API mode for builtin OpenAI without custom baseUrl", () => {
+    const dir = makeTempDir();
+    writeModelConfig(dir, makeConfig({
+      providerStrategy: "replace",
+      providers: [{
+        name: "openai",
+        apiKey: "OPENAI_API_KEY",
+        defaultModel: "gpt-5",
+        api: "openai-responses",
+      }],
+    }));
+
+    const modelsPath = join(dir, "models.json");
+    expect(existsSync(modelsPath)).toBe(true);
+    const models = JSON.parse(readFileSync(modelsPath, "utf8"));
+    expect(models.providers.openai.api).toBe("openai-responses");
+    expect(models.providers.openai.baseUrl).toBeUndefined();
+  });
+
+  it("writeModelConfig keeps API mode when overriding builtin baseUrl without discovered models", () => {
+    const dir = makeTempDir();
+    writeModelConfig(dir, makeConfig({
+      providerStrategy: "replace",
+      providers: [{
+        name: "openai",
+        apiKey: "OPENAI_API_KEY",
+        baseUrl: "https://api.openai.com/v1",
+        defaultModel: "gpt-4o",
+        api: "openai-responses",
+      }],
+    }));
+
+    const modelsPath = join(dir, "models.json");
+    expect(existsSync(modelsPath)).toBe(true);
+    const models = JSON.parse(readFileSync(modelsPath, "utf8"));
+    expect(models.providers.openai.baseUrl).toBe("https://api.openai.com/v1");
+    expect(models.providers.openai.api).toBe("openai-responses");
+  });
+
   it("writeProviderEnv merges auth/settings when strategy is add", () => {
     const dir = makeTempDir();
     const settingsPath = join(dir, "settings.json");

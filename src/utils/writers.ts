@@ -97,16 +97,25 @@ export function writeModelConfig(agentDir: string, config: OhPConfig) {
   const strategy = config.providerStrategy ?? "replace";
   const modelsPath = join(agentDir, "models.json");
 
-  const customProviders = config.providers.filter(p => p.baseUrl);
-  if (customProviders.length === 0) return;
+  // Persist custom endpoints and API mode overrides (e.g. built-in OpenAI responses/completions choice).
+  const modelProviders = config.providers.filter(p => p.baseUrl || (!!p.api && !!PROVIDERS[p.name]));
+  if (modelProviders.length === 0) return;
 
   const providers: Record<string, unknown> = strategy === "add"
     ? (readJson<{ providers?: Record<string, unknown> }>(modelsPath)?.providers ?? {})
     : {};
-  for (const cp of customProviders) {
+  for (const cp of modelProviders) {
     const isBuiltin = !!PROVIDERS[cp.name];
+    if (!cp.baseUrl && isBuiltin && cp.api) {
+      providers[cp.name] = { api: cp.api };
+      continue;
+    }
+
+    if (!cp.baseUrl) continue;
+
     if (isBuiltin && !cp.discoveredModels?.length) {
       const entry: Record<string, unknown> = { baseUrl: cp.baseUrl };
+      if (cp.api) entry.api = cp.api;
       if (cp.apiKey !== "none") entry.apiKey = cp.apiKey;
       providers[cp.name] = entry;
     } else {
