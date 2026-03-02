@@ -19,8 +19,26 @@ interface HorizontalTabsOptions {
 
 type TabAction = "left" | "right" | "edit" | "finish" | "cancel" | { jump: number };
 
+interface KeypressLike {
+  name?: string;
+  ctrl?: boolean;
+}
+
 function clearScreen() {
   process.stdout.write("\x1b[2J\x1b[H");
+}
+
+export function mapTabAction(str: string, key: KeypressLike, tabCount: number): TabAction | null {
+  if (key.ctrl && key.name === "c") return "cancel";
+  if (key.name === "left") return "left";
+  if (key.name === "right") return "right";
+  if (key.name === "return" || key.name === "enter" || key.name === "space" || key.name === "e") return "edit";
+  if (key.name === "f") return "finish";
+  if (/^[1-9]$/.test(str)) {
+    const idx = Number(str) - 1;
+    if (idx >= 0 && idx < tabCount) return { jump: idx };
+  }
+  return null;
 }
 
 function waitForAction(tabCount: number): Promise<TabAction> {
@@ -36,16 +54,9 @@ function waitForAction(tabCount: number): Promise<TabAction> {
       resolve(action);
     };
 
-    const onKeypress = (str: string, key: { name?: string; ctrl?: boolean }) => {
-      if (key.ctrl && key.name === "c") return done("cancel");
-      if (key.name === "left") return done("left");
-      if (key.name === "right") return done("right");
-      if (key.name === "return" || key.name === "space" || key.name === "e") return done("edit");
-      if (key.name === "f") return done("finish");
-      if (/^[1-9]$/.test(str)) {
-        const idx = Number(str) - 1;
-        if (idx >= 0 && idx < tabCount) return done({ jump: idx });
-      }
+    const onKeypress = (str: string, key: KeypressLike) => {
+      const action = mapTabAction(str, key, tabCount);
+      if (action) done(action);
     };
 
     stdin.on("keypress", onKeypress);
