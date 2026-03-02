@@ -304,7 +304,7 @@ async function setupProviderChoice(choice: string): Promise<ProviderConfig | nul
 
   let finalApi = api;
   if (name === "openai") {
-    finalApi = await selectOpenAIApiMode(info.label, defaultModel);
+    finalApi = await selectOpenAIApiModeWithHint(info.label, defaultModel);
   }
 
   p.log.success(t("provider.configured", { label: info.label }));
@@ -322,6 +322,11 @@ async function selectOpenAIApiMode(label: string, defaultModel: string): Promise
   });
   if (p.isCancel(selected)) { p.cancel(t("cancelled")); process.exit(0); }
   return resolveOpenAIApiMode(selected, defaultModel);
+}
+
+async function selectOpenAIApiModeWithHint(label: string, defaultModel: string): Promise<"openai-responses" | "openai-completions"> {
+  p.note(t("provider.apiModeIntro"), t("provider.apiModeNext"));
+  return selectOpenAIApiMode(label, defaultModel);
 }
 
 /**
@@ -353,7 +358,7 @@ async function setupCustomProvider(): Promise<ProviderConfig | null> {
 
   const { defaultModel, discoveredModels, api } = await selectModelWithMeta(name, name, [], baseUrl, apiKey);
   const finalApi = isOpenAICompatibleApi(api)
-    ? await selectOpenAIApiMode(name, defaultModel)
+    ? await selectOpenAIApiModeWithHint(name, defaultModel)
     : api;
 
   p.log.success(t("provider.customConfigured", { name, url: baseUrl }));

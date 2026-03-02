@@ -5,6 +5,18 @@ import { execSync } from "node:child_process";
 import type { OhPConfig } from "../types.js";
 import { writeProviderEnv, writeModelConfig, writeKeybindings, writeAgents, writeExtensions, writePrompts, writeSkills, writeTheme } from "./writers.js";
 
+const MANAGED_CONFIG_ENTRIES = [
+  "auth.json",
+  "settings.json",
+  "models.json",
+  "keybindings.json",
+  "AGENTS.md",
+  "extensions",
+  "prompts",
+  "skills",
+  "themes",
+];
+
 /**
  * 确保目录存在，若不存在则递归创建
  */
@@ -62,6 +74,9 @@ function copyDir(src: string, dest: string) {
 export function applyConfig(config: OhPConfig) {
   const agentDir = join(homedir(), ".pi", "agent");
   ensureDir(agentDir);
+  if ((config.providerStrategy ?? "replace") === "replace") {
+    cleanupManagedConfig(agentDir);
+  }
 
   writeProviderEnv(agentDir, config);
   writeModelConfig(agentDir, config);
@@ -71,6 +86,15 @@ export function applyConfig(config: OhPConfig) {
   writePrompts(agentDir, config);
   writeSkills(agentDir, config);
   writeTheme(agentDir, config);
+}
+
+/**
+ * Remove all files/dirs managed by oh-pi before strict replace apply.
+ */
+export function cleanupManagedConfig(agentDir: string) {
+  for (const entry of MANAGED_CONFIG_ENTRIES) {
+    rmSync(join(agentDir, entry), { recursive: true, force: true });
+  }
 }
 
 /**

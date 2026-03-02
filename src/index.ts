@@ -1,4 +1,3 @@
-import * as p from "@clack/prompts";
 import chalk from "chalk";
 import { selectLanguage, getLocale } from "./i18n.js";
 import { t } from "./i18n.js";
@@ -10,12 +9,12 @@ import { selectTheme } from "./tui/theme-select.js";
 import { selectKeybindings } from "./tui/keybinding-select.js";
 import { selectExtensions } from "./tui/extension-select.js";
 import { selectAgents } from "./tui/agents-select.js";
+import { runHorizontalTabs } from "./tui/horizontal-tabs.js";
 import { confirmApply } from "./tui/confirm-apply.js";
 import { detectEnv, type EnvInfo } from "./utils/detect.js";
 import type { OhPConfig } from "./types.js";
 import { EXTENSIONS } from "./registry.js";
-
-type CustomTab = "providers" | "appearance" | "features" | "agents" | "finish";
+type TabbedBaseConfig = Pick<OhPConfig, "theme" | "keybindings" | "extensions" | "prompts" | "agents" | "thinking">;
 
 /**
  * 主入口函数。检测环境、选择语言、展示欢迎界面，根据用户选择的模式执行对应配置流程，最终确认并应用配置。
@@ -65,8 +64,7 @@ async function quickFlow(env: EnvInfo): Promise<OhPConfig> {
  */
 async function presetFlow(env: EnvInfo): Promise<OhPConfig> {
   const preset = await selectPreset();
-  const providerSetup = await setupProviders(env);
-  return { ...preset, ...providerSetup };
+  return runTabbedFlow(env, preset);
 }
 
 /**
@@ -76,67 +74,97 @@ async function presetFlow(env: EnvInfo): Promise<OhPConfig> {
  */
 async function customFlow(env: EnvInfo): Promise<OhPConfig> {
   const defaultExtensions = EXTENSIONS.filter(e => e.default).map(e => e.name);
+  return runTabbedFlow(env, {
+    theme: "dark",
+    keybindings: "default",
+    extensions: defaultExtensions,
+    prompts: ["review", "fix", "explain", "commit", "test", "refactor", "optimize", "security", "document", "pr"],
+    agents: "general-developer",
+    thinking: "medium",
+  });
+}
+
+async function runTabbedFlow(env: EnvInfo, initial: TabbedBaseConfig): Promise<OhPConfig> {
+  const defaultExtensions = EXTENSIONS.filter(e => e.default).map(e => e.name);
   let providerSetup: ProviderSetupResult | null = null;
-  let theme = "dark";
-  let keybindings = "default";
-  let extensions = defaultExtensions;
-  let agents = "general-developer";
+  let theme = initial.theme;
+  let keybindings = initial.keybindings;
+  let extensions = initial.extensions.length > 0 ? [...initial.extensions] : defaultExtensions;
+  let agents = initial.agents;
+  await runHorizontalTabs({
+    title: t("custom.tabHeader"),
+    canFinish: () => !!providerSetup,
+    finishBlockedMessage: () => t("custom.needProviders"),
+    tabs: [
+      {
+        label: t("custom.tabProviders"),
+        summary: () => summarizeProviders(providerSetup),
+        details: () => providerDetails(providerSetup),
+        edit: async () => {
+          providerSetup = await setupProviders(env);
+        },
+      },
+      {
+        label: t("custom.tabAppearance"),
+        summary: () => `${t("confirm.theme")} ${theme} · ${t("confirm.keybindings")} ${keybindings}`,
+        details: () => [
+          `${chalk.dim(t("confirm.theme"))} ${chalk.cyan(theme)}`,
+          `${chalk.dim(t("confirm.keybindings"))} ${chalk.cyan(keybindings)}`,
+        ],
+        edit: async () => {
+          theme = await selectTheme();
+          keybindings = await selectKeybindings();
+        },
+      },
+      {
+        label: t("custom.tabFeatures"),
+        summary: () => t("custom.tabFeaturesHint", { count: extensions.length }),
+        details: () => [
+          chalk.dim(t("confirm.extensions")),
+          extensions.length > 0 ? `  ${extensions.join(", ")}` : `  ${t("confirm.none")}`,
+        ],
+        edit: async () => {
+          extensions = await selectExtensions();
+        },
+      },
+      {
+        label: t("custom.tabAgents"),
+        summary: () => `${t("confirm.agents")} ${agents}`,
+        details: () => [
+          `${chalk.dim(t("confirm.agents"))} ${chalk.cyan(agents)}`,
+          `${chalk.dim(t("confirm.thinking"))} ${chalk.cyan(initial.thinking)}`,
+        ],
+        edit: async () => {
+          agents = await selectAgents();
+        },
+      },
+      {
+        label: t("custom.tabFinish"),
+        summary: () => t("custom.tabFinishHint"),
+        details: () => [
+          chalk.dim(t("custom.tabFinishHelp")),
+        ],
+        edit: async () => {
+          // Finish tab is read-only; use key F to complete.
+        },
+      },
+    ],
+  });
 
-  while (true) {
-    const tabBar = [
-      chalk.cyan(`[${t("custom.tabProviders")}]`),
-      chalk.cyan(`[${t("custom.tabAppearance")}]`),
-      chalk.cyan(`[${t("custom.tabFeatures")}]`),
-      chalk.cyan(`[${t("custom.tabAgents")}]`),
-      chalk.green(`[${t("custom.tabFinish")}]`),
-    ].join(chalk.gray("  |  "));
-    const providerStatus = summarizeProviders(providerSetup);
-    p.note(`${tabBar}\n${providerStatus}`, t("custom.tabHeader"));
-
-    const tab = await p.select({
-      message: t("custom.tabPrompt"),
-      options: [
-        { value: "providers" as CustomTab, label: t("custom.tabProviders"), hint: providerStatus },
-        { value: "appearance" as CustomTab, label: t("custom.tabAppearance"), hint: `${theme} · ${keybindings}` },
-        { value: "features" as CustomTab, label: t("custom.tabFeatures"), hint: t("custom.tabFeaturesHint", { count: extensions.length }) },
-        { value: "agents" as CustomTab, label: t("custom.tabAgents"), hint: agents },
-        { value: "finish" as CustomTab, label: t("custom.tabFinish"), hint: t("custom.tabFinishHint") },
-      ],
-    });
-    if (p.isCancel(tab)) { p.cancel(t("cancelled")); process.exit(0); }
-
-    if (tab === "providers") {
-      providerSetup = await setupProviders(env);
-      continue;
-    }
-    if (tab === "appearance") {
-      theme = await selectTheme();
-      keybindings = await selectKeybindings();
-      continue;
-    }
-    if (tab === "features") {
-      extensions = await selectExtensions();
-      continue;
-    }
-    if (tab === "agents") {
-      agents = await selectAgents();
-      continue;
-    }
-    if (!providerSetup) {
-      p.log.warn(t("custom.needProviders"));
-      continue;
-    }
-    break;
+  if (!providerSetup) {
+    throw new Error("Provider setup is required before finishing tabbed flow");
   }
+  const finalProviderSetup = providerSetup as ProviderSetupResult;
 
   return {
-    ...providerSetup,
+    providers: finalProviderSetup.providers,
+    providerStrategy: finalProviderSetup.providerStrategy,
     theme,
     keybindings,
     extensions,
-    prompts: ["review", "fix", "explain", "commit", "test", "refactor", "optimize", "security", "document", "pr"],
+    prompts: initial.prompts,
     agents,
-    thinking: "medium",
+    thinking: initial.thinking,
   };
 }
 
@@ -150,4 +178,17 @@ function summarizeProviders(setup: ProviderSetupResult | null): string {
   }
   if (setup.providers.length === 0) return t("confirm.providerStrategyReplace");
   return t("custom.providersReplace", { list: setup.providers.map(p => p.name).join(", ") });
+}
+
+function providerDetails(setup: ProviderSetupResult | null): string[] {
+  if (!setup) return [chalk.dim(t("custom.needProviders"))];
+  if (setup.providerStrategy === "keep") return [chalk.dim(t("confirm.providerStrategyKeep"))];
+  if (setup.providers.length === 0) return [chalk.dim(t("confirm.none"))];
+
+  const primary = setup.providers[0];
+  return [
+    `${chalk.dim(t("confirm.providerStrategy"))} ${chalk.cyan(setup.providerStrategy)}`,
+    `${chalk.dim(t("confirm.providers"))} ${chalk.cyan(setup.providers.map(p => p.name).join(", "))}`,
+    `${chalk.dim(t("confirm.model"))} ${chalk.cyan(primary?.defaultModel ?? t("confirm.none"))}`,
+  ];
 }
