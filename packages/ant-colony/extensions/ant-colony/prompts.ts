@@ -82,10 +82,14 @@ export function buildPrompt(
 	castePrompt: string,
 	maxTurns?: number,
 	tandem?: { parentResult?: string; priorError?: string },
+	budgetSection?: string,
 ): string {
 	let prompt = `${castePrompt}\n\n`;
 	if (maxTurns) {
 		prompt += `## ⚠️ Turn Limit\nYou have a MAXIMUM of ${maxTurns} turns. Plan accordingly — reserve your LAST turn to output the structured result format above. Do NOT waste turns on unnecessary exploration.\n\n`;
+	}
+	if (budgetSection) {
+		prompt += budgetSection;
 	}
 	if (pheromoneContext) {
 		prompt += `## Colony Pheromone Trail (intelligence from other ants)\n${pheromoneContext}\n\n`;

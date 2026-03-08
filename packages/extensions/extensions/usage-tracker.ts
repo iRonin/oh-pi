@@ -481,6 +481,44 @@ export default function usageTracker(pi: ExtensionAPI) {
 		}
 	}
 
+	// ─── Inter-extension event broadcasting ──────────────────────────────
+
+	/**
+	 * Broadcast current usage/rate-limit data to other extensions via `pi.events`.
+	 *
+	 * The ant-colony budget-planner listens on `"usage:limits"` to receive:
+	 * - Provider rate limit windows (Claude session/weekly %, Codex 5h/weekly %)
+	 * - Aggregate session cost
+	 * - Per-model usage snapshots
+	 *
+	 * Other extensions may also listen for dashboard/alerting purposes.
+	 */
+	function broadcastUsageData(): void {
+		const totals = getTotals();
+		const providers: Record<string, ProviderRateLimits> = {};
+		for (const [key, value] of rateLimits) {
+			providers[key] = value;
+		}
+		const perModel: Record<string, ModelUsage> = {};
+		for (const [key, value] of models) {
+			perModel[key] = { ...value };
+		}
+		pi.events.emit("usage:limits", {
+			providers,
+			sessionCost: totals.cost,
+			perModel,
+		});
+	}
+
+	/**
+	 * Respond to on-demand queries from other extensions.
+	 * When an extension emits `"usage:query"`, we immediately broadcast
+	 * current data via `"usage:limits"`.
+	 */
+	pi.events.on("usage:query", () => {
+		broadcastUsageData();
+	});
+
 	// ─── Report generation ────────────────────────────────────────────────
 
 	/** Render rate limit windows as plain text (for LLM tool). */
@@ -745,6 +783,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 			recordUsage(event.message as unknown as AssistantMessage);
 			checkThresholds(ctx);
 			triggerProbe(ctx); // Refresh rate limits after each turn
+			broadcastUsageData(); // Notify other extensions (ant-colony budget planner)
 		}
 	});
 
@@ -862,7 +901,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 
 	// ─── Keyboard shortcut ────────────────────────────────────────────────
 
-	pi.registerShortcut("ctrl+u", {
+	pi.registerShortcut("ctrl+shift+u", {
 		description: "Show usage dashboard (rate limits + costs)",
 		async handler(ctx) {
 			triggerProbe(ctx);

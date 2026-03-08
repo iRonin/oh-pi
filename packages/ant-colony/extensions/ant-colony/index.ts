@@ -228,6 +228,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 				signal: signal ?? undefined,
 				callbacks,
 				modelRegistry: params.modelRegistry,
+				eventBus: pi.events, // Usage-tracker integration for budget-aware planning
 			});
 
 			return {
@@ -371,6 +372,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 			callbacks,
 			authStorage: undefined,
 			modelRegistry: params.modelRegistry,
+			eventBus: pi.events, // Usage-tracker integration for budget-aware planning
 		};
 		colony.promise = resume ? resumeColony(colonyOpts) : runColony(colonyOpts);
 

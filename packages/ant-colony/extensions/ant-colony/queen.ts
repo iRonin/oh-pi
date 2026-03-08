@@ -15,6 +15,13 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { AuthStorage, ModelRegistry } from "@mariozechner/pi-coding-agent";
+import {
+	applyConcurrencyCap,
+	type BudgetPlan,
+	buildBudgetPromptSection,
+	planBudget,
+	type UsageLimitsEvent,
+} from "./budget-planner.js";
 import { adapt, defaultConcurrency, sampleSystem } from "./concurrency.js";
 import { buildImportGraph, type ImportGraph, taskDependsOn } from "./deps.js";
 import { Nest } from "./nest.js";
@@ -44,6 +51,13 @@ export interface QueenCallbacks {
 	onComplete?(state: ColonyState): void;
 }
 
+/** Event emitter interface for inter-extension communication. */
+export interface ColonyEventBus {
+	emit(event: string, data?: unknown): void;
+	on(event: string, handler: (data: unknown) => void): void;
+	off(event: string, handler: (data: unknown) => void): void;
+}
+
 export interface QueenOptions {
 	cwd: string;
 	goal: string;
@@ -55,6 +69,8 @@ export interface QueenOptions {
 	callbacks: QueenCallbacks;
 	authStorage?: AuthStorage;
 	modelRegistry?: ModelRegistry;
+	/** Event bus for cross-extension communication (usage-tracker integration). */
+	eventBus?: ColonyEventBus;
 }
 
 function makeColonyId(): string {
@@ -305,6 +321,8 @@ interface WaveOptions {
 	authStorage?: AuthStorage;
 	modelRegistry?: ModelRegistry;
 	importGraph?: ImportGraph;
+	/** Budget plan from the usage-aware planner (may be null if no data available). */
+	budgetPlan?: BudgetPlan | null;
 }
 
 /**
@@ -340,6 +358,14 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
 	const { nest, cwd, caste, signal, callbacks, currentModel, emitSignal } = opts;
 	const casteModel = opts.modelOverrides?.[caste] || currentModel;
 	const baseConfig = { ...DEFAULT_ANT_CONFIGS[caste], model: casteModel };
+
+	// Budget-aware turn cap: if the budget planner recommends fewer turns, use that
+	if (opts.budgetPlan) {
+		const casteBudget = opts.budgetPlan.castes[caste];
+		if (casteBudget && casteBudget.maxTurns < baseConfig.maxTurns) {
+			baseConfig.maxTurns = casteBudget.maxTurns;
+		}
+	}
 
 	let backoffMs = 0; // 429 backoff duration
 	let consecutiveRateLimits = 0; // Consecutive rate limit counter
@@ -400,10 +426,22 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
 			} else if (progress > 0.7) {
 				config.maxTurns = Math.max(baseConfig.maxTurns - 5, 5); // Late convergence, only cleanup/fixes
 			}
+			// Build budget-awareness prompt section for non-drone ants
+			const budgetSection = opts.budgetPlan ? buildBudgetPromptSection(opts.budgetPlan) : undefined;
 			const antPromise =
 				caste === "drone"
 					? runDrone(cwd, nest, task)
-					: spawnAnt(cwd, nest, task, config, antSignal, callbacks.onAntStream, opts.authStorage, opts.modelRegistry);
+					: spawnAnt(
+							cwd,
+							nest,
+							task,
+							config,
+							antSignal,
+							callbacks.onAntStream,
+							opts.authStorage,
+							opts.modelRegistry,
+							budgetSection,
+						);
 			let timeoutId: ReturnType<typeof setTimeout>;
 			const result = await Promise.race([
 				antPromise.finally(() => clearTimeout(timeoutId)),
@@ -596,7 +634,11 @@ async function runAntWave(opts: WaveOptions): Promise<"ok" | "budget"> {
 			nest.recordSample(sample);
 		}
 
-		const concurrency = adapt(state.concurrency, pending.length);
+		let concurrency = adapt(state.concurrency, pending.length);
+		// Apply budget-aware concurrency cap (rate limits / cost constraints)
+		if (opts.budgetPlan) {
+			concurrency = applyConcurrencyCap(concurrency, opts.budgetPlan);
+		}
 		nest.updateState({ concurrency });
 
 		// Dispatch ants (concurrency determined by adapt())
@@ -711,7 +753,32 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
 		modelRegistry: opts.modelRegistry,
 	};
 
+	// ═══ Usage-aware budget planning ═══
+	// Query the usage-tracker extension for rate limit / cost data via the event bus.
+	// The result is used to cap concurrency, limit turns, and inject budget context into prompts.
+	const refreshBudgetPlan = (): BudgetPlan | null => {
+		if (!opts.eventBus) {
+			// No event bus → plan based on colony metrics alone (no rate limit awareness)
+			return planBudget(null, nest.getStateLight().metrics, opts.maxCost ?? null, nest.getStateLight().concurrency);
+		}
+
+		// Request fresh data from usage-tracker (fire-and-forget, they respond via "usage:limits")
+		let latestLimits: UsageLimitsEvent | null = null;
+		const handler = (data: unknown) => {
+			latestLimits = data as UsageLimitsEvent;
+		};
+		opts.eventBus.on("usage:limits", handler);
+		opts.eventBus.emit("usage:query");
+		opts.eventBus.off("usage:limits", handler);
+
+		const state = nest.getStateLight();
+		return planBudget(latestLimits, state.metrics, opts.maxCost ?? null, state.concurrency);
+	};
+
 	try {
+		// Initial budget plan
+		waveBase.budgetPlan = refreshBudgetPlan();
+
 		// ═══ Phase 1: Scouting (Bio 5: Colony voting — complex goals get multiple scouts) ═══
 		const scoutCountBase = opts.goal.length > 500 ? 3 : opts.goal.length > 200 ? 2 : 1;
 		const scoutCount = shouldUseScoutQuorum(opts.goal) ? Math.max(2, scoutCountBase) : scoutCountBase;
@@ -785,6 +852,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
 		}
 
 		// ═══ Phase 2: Working ═══
+		waveBase.budgetPlan = refreshBudgetPlan(); // Refresh budget before work phase
 		nest.updateState({ status: "working" });
 
 		// Build import graph for dependency-aware scheduling
@@ -885,6 +953,7 @@ export async function runColony(opts: QueenOptions): Promise<ColonyState> {
 		}
 
 		// ═══ Phase 3: Review ═══
+		waveBase.budgetPlan = refreshBudgetPlan(); // Refresh budget before review phase
 		const completedWorkerTasks = nest.getAllTasks().filter((t) => t.caste === "worker" && t.status === "done");
 		if (completedWorkerTasks.length > 0 && (!tscPassed || completedWorkerTasks.length > 3)) {
 			nest.updateState({ status: "reviewing" });
@@ -949,7 +1018,7 @@ export async function resumeColony(opts: QueenOptions): Promise<ColonyState> {
 		callbacks.onSignal?.({ phase, progress, active, cost: m.totalCost, message });
 	};
 
-	const waveBase: Omit<WaveOptions, "caste"> = {
+	const waveBase: Omit<WaveOptions, "caste"> & { budgetPlan?: BudgetPlan | null } = {
 		nest,
 		cwd: opts.cwd,
 		signal,
@@ -960,6 +1029,19 @@ export async function resumeColony(opts: QueenOptions): Promise<ColonyState> {
 		authStorage: opts.authStorage,
 		modelRegistry: opts.modelRegistry,
 	};
+
+	// Budget plan for resumed colony
+	if (opts.eventBus) {
+		let latestLimits: UsageLimitsEvent | null = null;
+		const handler = (data: unknown) => {
+			latestLimits = data as UsageLimitsEvent;
+		};
+		opts.eventBus.on("usage:limits", handler);
+		opts.eventBus.emit("usage:query");
+		opts.eventBus.off("usage:limits", handler);
+		const state = nest.getStateLight();
+		waveBase.budgetPlan = planBudget(latestLimits, state.metrics, opts.maxCost ?? null, state.concurrency);
+	}
 
 	const cleanup = () => {
 		nest.destroy();

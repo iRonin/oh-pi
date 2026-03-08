@@ -176,10 +176,10 @@ describe("usage-tracker extension", () => {
 			expect(pi._commands.has("usage-refresh")).toBe(true);
 		});
 
-		it("registers ctrl+u shortcut", () => {
+		it("registers ctrl+shift+u shortcut (avoids ctrl+u conflict with deleteToLineStart)", () => {
 			usageTracker(pi as any);
-			expect(pi._shortcuts.has("ctrl+u")).toBe(true);
-			expect(pi._shortcuts.get("ctrl+u").description).toContain("rate limits");
+			expect(pi._shortcuts.has("ctrl+shift+u")).toBe(true);
+			expect(pi._shortcuts.get("ctrl+shift+u").description).toContain("rate limits");
 		});
 	});
 
@@ -451,6 +451,97 @@ describe("usage-tracker extension", () => {
 			const tool = pi._tools.get("usage_report");
 			const result = await runWithTimers(() => tool.execute("id", { format: "detailed" }, undefined, undefined, ctx));
 			expect(result.content[0].text).toContain("1.5M in");
+		});
+	});
+
+	describe("inter-extension event broadcasting", () => {
+		it("registers usage:query listener on pi.events", () => {
+			usageTracker(pi as any);
+			expect(pi.events.on).toHaveBeenCalledWith("usage:query", expect.any(Function));
+		});
+
+		it("broadcasts usage:limits on turn_end", () => {
+			usageTracker(pi as any);
+			pi._emit("session_start", { type: "session_start" }, ctx);
+
+			const msg = makeAssistantMessage({ input: 1000, output: 500, costTotal: 0.01 });
+			pi._emit("turn_end", { type: "turn_end", turnIndex: 0, message: msg, toolResults: [] }, ctx);
+
+			expect(pi.events.emit).toHaveBeenCalledWith(
+				"usage:limits",
+				expect.objectContaining({
+					sessionCost: expect.any(Number),
+					providers: expect.any(Object),
+					perModel: expect.any(Object),
+				}),
+			);
+		});
+
+		it("includes per-model data in broadcast", () => {
+			usageTracker(pi as any);
+			pi._emit("session_start", { type: "session_start" }, ctx);
+
+			const msg = makeAssistantMessage({
+				model: "claude-sonnet-4-20250514",
+				input: 1000,
+				output: 500,
+				costTotal: 0.01,
+			});
+			pi._emit("turn_end", { type: "turn_end", turnIndex: 0, message: msg, toolResults: [] }, ctx);
+
+			// Find the last usage:limits call
+			const emitCalls = (pi.events.emit as ReturnType<typeof vi.fn>).mock.calls;
+			const limitsCalls = emitCalls.filter((c: unknown[]) => c[0] === "usage:limits");
+			expect(limitsCalls.length).toBeGreaterThan(0);
+			const lastCall = limitsCalls[limitsCalls.length - 1];
+			const data = lastCall[1] as { perModel: Record<string, { model: string }> };
+			expect(data.perModel["claude-sonnet-4-20250514"]).toBeDefined();
+			expect(data.perModel["claude-sonnet-4-20250514"].model).toBe("claude-sonnet-4-20250514");
+		});
+
+		it("responds to usage:query by broadcasting current data", () => {
+			// Get the handler registered via pi.events.on("usage:query", handler)
+			const onCalls = (pi.events.on as ReturnType<typeof vi.fn>).mock.calls;
+			usageTracker(pi as any);
+			pi._emit("session_start", { type: "session_start" }, ctx);
+
+			// Record a turn so there's data
+			const msg = makeAssistantMessage({ input: 500, output: 250, costTotal: 0.005 });
+			pi._emit("turn_end", { type: "turn_end", turnIndex: 0, message: msg, toolResults: [] }, ctx);
+
+			// Clear previous emit calls
+			(pi.events.emit as ReturnType<typeof vi.fn>).mockClear();
+
+			// Find and invoke the usage:query handler
+			const updatedOnCalls = (pi.events.on as ReturnType<typeof vi.fn>).mock.calls;
+			const queryHandler = updatedOnCalls.find((c: unknown[]) => c[0] === "usage:query")?.[1] as () => void;
+			expect(queryHandler).toBeDefined();
+			queryHandler();
+
+			expect(pi.events.emit).toHaveBeenCalledWith(
+				"usage:limits",
+				expect.objectContaining({
+					sessionCost: expect.any(Number),
+				}),
+			);
+		});
+
+		it("broadcasts session cost of zero when no turns recorded", () => {
+			usageTracker(pi as any);
+			pi._emit("session_start", { type: "session_start" }, ctx);
+
+			// Trigger a turn_end with zero cost message — let's just invoke usage:query directly
+			(pi.events.emit as ReturnType<typeof vi.fn>).mockClear();
+			const onCalls = (pi.events.on as ReturnType<typeof vi.fn>).mock.calls;
+			const queryHandler = onCalls.find((c: unknown[]) => c[0] === "usage:query")?.[1] as () => void;
+			expect(queryHandler).toBeDefined();
+			queryHandler();
+
+			const emitCalls = (pi.events.emit as ReturnType<typeof vi.fn>).mock.calls;
+			const limitsCalls = emitCalls.filter((c: unknown[]) => c[0] === "usage:limits");
+			expect(limitsCalls.length).toBe(1);
+			const data = limitsCalls[0][1] as { sessionCost: number };
+			expect(data.sessionCost).toBe(0);
 		});
 	});
 });

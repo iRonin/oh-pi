@@ -182,6 +182,7 @@ export async function spawnAnt(
 	onStream?: (event: AntStreamEvent) => void,
 	authStorage?: AuthStorage,
 	modelRegistry?: ModelRegistry,
+	budgetPromptSection?: string,
 ): Promise<AntResult> {
 	if (!antConfig.model) {
 		throw new Error("No model resolved for ant");
@@ -221,7 +222,7 @@ export async function spawnAnt(
 
 	const pheromoneCtx = nest.getPheromoneContext(task.files);
 	const castePrompt = CASTE_PROMPTS[antConfig.caste];
-	const systemPrompt = buildPrompt(task, pheromoneCtx, castePrompt, effectiveMaxTurns, tandem);
+	const systemPrompt = buildPrompt(task, pheromoneCtx, castePrompt, effectiveMaxTurns, tandem, budgetPromptSection);
 
 	const auth = authStorage ?? new AuthStorage();
 	const registry = modelRegistry ?? new ModelRegistry(auth);
