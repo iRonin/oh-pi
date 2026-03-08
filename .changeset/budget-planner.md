@@ -28,4 +28,6 @@ resources across scout, worker, and soldier castes.
 
 ### Fixed: usage-tracker shortcut conflict
 
-Changed `Ctrl+U` → `Ctrl+Shift+U` to avoid conflict with the built-in `deleteToLineStart` binding.
+`Ctrl+U` is kept as the usage dashboard shortcut. The extension now auto-configures
+`~/.pi/agent/keybindings.json` on first load to unbind `deleteToLineStart` from `ctrl+u`,
+eliminating the conflict warning without requiring manual user configuration.

@@ -20,6 +20,9 @@
  * **`Ctrl+U`** shortcut to open the overlay.
  */
 
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
@@ -324,7 +327,34 @@ async function probeCodex(
 
 // ─── Extension entry point ──────────────────────────────────────────────────
 
+/**
+ * Ensure `ctrl+u` is unbound from the built-in `deleteToLineStart` action
+ * so the usage-tracker shortcut takes priority without a conflict warning.
+ *
+ * Reads `~/.pi/agent/keybindings.json`, sets `deleteToLineStart: []` if not
+ * already configured, and writes back. This is a one-time idempotent operation.
+ */
+function ensureCtrlUUnbound(): void {
+	const keybindingsPath = join(homedir(), ".pi", "agent", "keybindings.json");
+	try {
+		let config: Record<string, unknown> = {};
+		if (existsSync(keybindingsPath)) {
+			config = JSON.parse(readFileSync(keybindingsPath, "utf-8"));
+		}
+		// Only write if deleteToLineStart isn't already configured
+		if (!("deleteToLineStart" in config)) {
+			config.deleteToLineStart = [];
+			writeFileSync(keybindingsPath, `${JSON.stringify(config, null, 2)}\n`, "utf-8");
+		}
+	} catch {
+		// Non-critical — worst case the warning still shows
+	}
+}
+
 export default function usageTracker(pi: ExtensionAPI) {
+	// Unbind ctrl+u from deleteToLineStart so our shortcut wins cleanly
+	ensureCtrlUUnbound();
+
 	/** Per-model accumulated usage. Key = model ID. */
 	const models = new Map<string, ModelUsage>();
 	/** Recent turn snapshots for pace calc. */

@@ -9,6 +9,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
+vi.mock("node:fs", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("node:fs")>();
+	return {
+		...actual,
+		existsSync: vi.fn().mockReturnValue(false),
+		readFileSync: vi.fn().mockReturnValue("{}"),
+		writeFileSync: vi.fn(),
+	};
+});
+
+vi.mock("node:os", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("node:os")>();
+	return { ...actual, homedir: () => "/mock-home" };
+});
+
 vi.mock("@mariozechner/pi-coding-agent", () => ({
 	CustomEditor: class {},
 }));
@@ -135,6 +150,7 @@ async function runWithTimers<T>(fn: () => Promise<T>): Promise<T> {
 
 // ─── Import ──────────────────────────────────────────────────────────────────
 
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import usageTracker from "./usage-tracker.js";
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -542,6 +558,61 @@ describe("usage-tracker extension", () => {
 			expect(limitsCalls.length).toBe(1);
 			const data = limitsCalls[0][1] as { sessionCost: number };
 			expect(data.sessionCost).toBe(0);
+		});
+	});
+
+	describe("keybinding auto-configuration", () => {
+		it("writes keybindings.json to unbind deleteToLineStart when file does not exist", () => {
+			(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+			usageTracker(pi as any);
+
+			expect(writeFileSync).toHaveBeenCalledWith(
+				expect.stringContaining("keybindings.json"),
+				expect.stringContaining('"deleteToLineStart"'),
+				"utf-8",
+			);
+		});
+
+		it("writes keybindings.json when file exists but deleteToLineStart is not configured", () => {
+			(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+			(readFileSync as ReturnType<typeof vi.fn>).mockReturnValue('{"cursorUp": ["up"]}');
+
+			usageTracker(pi as any);
+
+			expect(writeFileSync).toHaveBeenCalledWith(
+				expect.stringContaining("keybindings.json"),
+				expect.stringContaining('"deleteToLineStart": []'),
+				"utf-8",
+			);
+		});
+
+		it("does not overwrite keybindings.json when deleteToLineStart is already configured", () => {
+			(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+			(readFileSync as ReturnType<typeof vi.fn>).mockReturnValue('{"deleteToLineStart": ["ctrl+shift+u"]}');
+
+			(writeFileSync as ReturnType<typeof vi.fn>).mockClear();
+			usageTracker(pi as any);
+
+			// writeFileSync should not be called for keybindings (may be called for other things)
+			const keybindingWrites = (writeFileSync as ReturnType<typeof vi.fn>).mock.calls.filter(
+				(c: unknown[]) => typeof c[0] === "string" && (c[0] as string).includes("keybindings.json"),
+			);
+			expect(keybindingWrites).toHaveLength(0);
+		});
+
+		it("preserves existing keybindings when adding deleteToLineStart", () => {
+			(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(true);
+			(readFileSync as ReturnType<typeof vi.fn>).mockReturnValue('{"cursorUp": ["up", "ctrl+p"]}');
+
+			usageTracker(pi as any);
+
+			const writeCalls = (writeFileSync as ReturnType<typeof vi.fn>).mock.calls.filter(
+				(c: unknown[]) => typeof c[0] === "string" && (c[0] as string).includes("keybindings.json"),
+			);
+			expect(writeCalls).toHaveLength(1);
+			const written = JSON.parse(writeCalls[0][1] as string);
+			expect(written.cursorUp).toEqual(["up", "ctrl+p"]);
+			expect(written.deleteToLineStart).toEqual([]);
 		});
 	});
 });
