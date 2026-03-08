@@ -54,6 +54,8 @@ interface ColonyLogEntry {
 }
 
 interface BackgroundColony {
+	/** Short identifier for this colony (c1, c2, ...). */
+	id: string;
 	goal: string;
 	abortController: AbortController;
 	state: ColonyState | null;
@@ -64,8 +66,30 @@ interface BackgroundColony {
 }
 
 export default function antColonyExtension(pi: ExtensionAPI) {
-	// Currently running background colony (only one at a time)
-	let activeColony: BackgroundColony | null = null;
+	/** All running background colonies, keyed by short ID. */
+	const colonies = new Map<string, BackgroundColony>();
+	/** Auto-incrementing colony counter for generating IDs. */
+	let colonyCounter = 0;
+
+	/** Generate a short colony ID like c1, c2, ... */
+	function nextColonyId(): string {
+		colonyCounter++;
+		return `c${colonyCounter}`;
+	}
+
+	/**
+	 * Resolve a colony by ID. If no ID given and exactly one colony is running,
+	 * returns that one. Returns null if no match or ambiguous.
+	 */
+	function resolveColony(idArg?: string): BackgroundColony | null {
+		if (idArg) {
+			return colonies.get(idArg) ?? null;
+		}
+		if (colonies.size === 1) {
+			return colonies.values().next().value ?? null;
+		}
+		return null;
+	}
 
 	// Prevent main process polling from blocking: only allow explicit manual snapshots with cooldown
 	let lastBgStatusSnapshotAt = 0;
@@ -166,26 +190,30 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 		}
 
 		renderHandler = () => {
-			if (!activeColony) {
+			if (colonies.size === 0) {
 				return;
 			}
-			const { state } = activeColony;
-			const elapsed = state ? formatDuration(Date.now() - state.createdAt) : "0s";
-			const m = state?.metrics;
-			const phase = state?.status || "scouting";
-			const progress = calcProgress(m);
-			const pct = `${Math.round(progress * 100)}%`;
-			const active = activeColony.antStreams.size;
+			const statusParts: string[] = [];
+			for (const colony of colonies.values()) {
+				const { state } = colony;
+				const elapsed = state ? formatDuration(Date.now() - state.createdAt) : "0s";
+				const m = state?.metrics;
+				const phase = state?.status || "scouting";
+				const progress = calcProgress(m);
+				const pct = `${Math.round(progress * 100)}%`;
+				const active = colony.antStreams.size;
 
-			const parts = [`🐜 ${statusIcon(phase)} ${statusLabel(phase)}`];
-			parts.push(m ? `${m.tasksDone}/${m.tasksTotal} (${pct})` : `0/0 (${pct})`);
-			parts.push(`⚡${active}`);
-			if (m) {
-				parts.push(formatCost(m.totalCost));
+				const parts = [`🐜[${colony.id}] ${statusIcon(phase)} ${statusLabel(phase)}`];
+				parts.push(m ? `${m.tasksDone}/${m.tasksTotal} (${pct})` : `0/0 (${pct})`);
+				parts.push(`⚡${active}`);
+				if (m) {
+					parts.push(formatCost(m.totalCost));
+				}
+				parts.push(elapsed);
+				statusParts.push(parts.join(" │ "));
 			}
-			parts.push(elapsed);
 
-			ctx.ui.setStatus("ant-colony", parts.join(" │ "));
+			ctx.ui.setStatus("ant-colony", statusParts.join("  ·  "));
 		};
 		clearHandler = () => {
 			ctx.ui.setStatus("ant-colony", undefined);
@@ -256,17 +284,11 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 			modelRegistry?: any;
 		},
 		resume = false,
-	) {
-		if (activeColony) {
-			pi.events.emit("ant-colony:notify", {
-				msg: "A colony is already running. Use /colony-stop first.",
-				level: "warning",
-			});
-			return;
-		}
-
+	): string {
+		const colonyId = nextColonyId();
 		const abortController = new AbortController();
 		const colony: BackgroundColony = {
+			id: colonyId,
 			goal: params.goal,
 			abortController,
 			state: null,
@@ -276,7 +298,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 			promise: null as any, // set below
 		};
 
-		pushLog(colony, { level: "info", text: "INITIALIZING · Colony launched in background" });
+		pushLog(colony, { level: "info", text: `INITIALIZING · Colony [${colonyId}] launched in background` });
 
 		let lastPhase = "";
 
@@ -291,7 +313,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 					pi.sendMessage(
 						{
 							customType: "ant-colony-progress",
-							content: `[COLONY_SIGNAL:${signal.phase.toUpperCase()}] 🐜 ${signal.message} (${pct}%, ${formatCost(signal.cost)})`,
+							content: `[COLONY_SIGNAL:${signal.phase.toUpperCase()}] 🐜[${colonyId}] ${signal.message} (${pct}%, ${formatCost(signal.cost)})`,
 							display: true,
 						},
 						{ triggerTurn: false, deliverAs: "followUp" },
@@ -327,7 +349,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 				pi.sendMessage(
 					{
 						customType: "ant-colony-progress",
-						content: `[COLONY_SIGNAL:TASK_DONE] 🐜 ${icon} ${task.title.slice(0, 60)} (${progress}, ${cost})`,
+						content: `[COLONY_SIGNAL:TASK_DONE] 🐜[${colonyId}] ${icon} ${task.title.slice(0, 60)} (${progress}, ${cost})`,
 						display: true,
 					},
 					{ triggerTurn: false, deliverAs: "followUp" },
@@ -376,7 +398,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 		};
 		colony.promise = resume ? resumeColony(colonyOpts) : runColony(colonyOpts);
 
-		activeColony = colony;
+		colonies.set(colonyId, colony);
 		lastBgStatusSnapshotAt = 0;
 		throttledRender();
 
@@ -391,39 +413,44 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 					text: `${ok ? "COMPLETE" : "FAILED"} · ${m.tasksDone}/${m.tasksTotal} · ${formatCost(m.totalCost)}`,
 				});
 
-				// Clear UI
-				pi.events.emit("ant-colony:clear-ui");
-				activeColony = null;
+				colonies.delete(colonyId);
+				if (colonies.size === 0) {
+					pi.events.emit("ant-colony:clear-ui");
+				}
 
 				// Inject results into conversation
 				pi.sendMessage(
 					{
 						customType: "ant-colony-report",
-						content: `[COLONY_SIGNAL:COMPLETE]\n${report}`,
+						content: `[COLONY_SIGNAL:COMPLETE] [${colonyId}]\n${report}`,
 						display: true,
 					},
 					{ triggerTurn: true, deliverAs: "followUp" },
 				);
 
 				pi.events.emit("ant-colony:notify", {
-					msg: `🐜 Colony ${ok ? "completed" : "failed"}: ${m.tasksDone}/${m.tasksTotal} tasks │ ${formatCost(m.totalCost)}`,
+					msg: `🐜[${colonyId}] Colony ${ok ? "completed" : "failed"}: ${m.tasksDone}/${m.tasksTotal} tasks │ ${formatCost(m.totalCost)}`,
 					level: ok ? "success" : "error",
 				});
 			})
 			.catch((e) => {
 				pushLog(colony, { level: "error", text: `CRASHED · ${String(e).slice(0, 120)}` });
-				pi.events.emit("ant-colony:clear-ui");
-				activeColony = null;
-				pi.events.emit("ant-colony:notify", { msg: `🐜 Colony crashed: ${e}`, level: "error" });
+				colonies.delete(colonyId);
+				if (colonies.size === 0) {
+					pi.events.emit("ant-colony:clear-ui");
+				}
+				pi.events.emit("ant-colony:notify", { msg: `🐜[${colonyId}] Colony crashed: ${e}`, level: "error" });
 				pi.sendMessage(
 					{
 						customType: "ant-colony-report",
-						content: `[COLONY_SIGNAL:FAILED]\n## 🐜 Colony Crashed\n${e}`,
+						content: `[COLONY_SIGNAL:FAILED] [${colonyId}]\n## 🐜 Colony Crashed\n${e}`,
 						display: true,
 					},
 					{ triggerTurn: true, deliverAs: "followUp" },
 				);
 			});
+
+		return colonyId;
 	}
 
 	// ═══ Custom message renderer for colony progress signals ═══
@@ -496,8 +523,8 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 	pi.registerShortcut("ctrl+shift+a", {
 		description: "Show ant colony details",
 		async handler(ctx) {
-			if (!activeColony) {
-				ctx.ui.notify("No colony is currently running.", "info");
+			if (colonies.size === 0) {
+				ctx.ui.notify("No colonies are currently running.", "info");
 				return;
 			}
 
@@ -507,9 +534,18 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 					let cachedLines: string[] | undefined;
 					let currentTab: "tasks" | "streams" | "log" = "tasks";
 					let taskFilter: "all" | "active" | "done" | "failed" = "all";
+					/** Which colony to display (cycles with 'n'). */
+					let selectedColonyIdx = 0;
+
+					const getSelectedColony = (): BackgroundColony | null => {
+						const ids = [...colonies.keys()];
+						if (ids.length === 0) return null;
+						const idx = selectedColonyIdx % ids.length;
+						return colonies.get(ids[idx]) ?? null;
+					};
 
 					const buildLines = (width: number): string[] => {
-						const c = activeColony;
+						const c = getSelectedColony();
 						if (!c) return [theme.fg("muted", "  No colony running.")];
 
 						const lines: string[] = [];
@@ -525,8 +561,18 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 						const activeAnts = c.antStreams.size;
 						const barWidth = Math.max(10, Math.min(24, w - 28));
 
+						// Show colony selector if multiple are running
+						if (colonies.size > 1) {
+							const ids = [...colonies.keys()];
+							const idx = selectedColonyIdx % ids.length;
+							const selector = ids
+								.map((id, i) => (i === idx ? theme.fg("accent", theme.bold(`[${id}]`)) : theme.fg("muted", id)))
+								.join(" ");
+							lines.push(`  ${selector}  ${theme.fg("dim", "(n = next colony)")}`);
+						}
+
 						lines.push(
-							theme.fg("accent", theme.bold("  🐜 Colony Details")) + theme.fg("muted", ` │ ${elapsed} │ ${cost}`),
+							theme.fg("accent", theme.bold(`  🐜 Colony [${c.id}]`)) + theme.fg("muted", ` │ ${elapsed} │ ${cost}`),
 						);
 						lines.push(theme.fg("muted", `  Goal: ${trim(c.goal, w - 8)}`));
 						lines.push(
@@ -705,6 +751,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 							else if (data.toLowerCase() === "a") taskFilter = "active";
 							else if (data.toLowerCase() === "d") taskFilter = "done";
 							else if (data.toLowerCase() === "f") taskFilter = "failed";
+							else if (data.toLowerCase() === "n") selectedColonyIdx++;
 							else return;
 
 							cachedWidth = undefined;
@@ -747,18 +794,6 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 		}),
 
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-			if (activeColony) {
-				return {
-					content: [
-						{
-							type: "text",
-							text: "A colony is already running in the background. Use /colony-stop to cancel it first.",
-						},
-					],
-					isError: true,
-				};
-			}
-
 			const currentModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : null;
 			if (!currentModel) {
 				return {
@@ -788,13 +823,13 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 			}
 
 			// Interactive mode: run in background
-			launchBackgroundColony(colonyParams);
+			const launchedId = launchBackgroundColony(colonyParams);
 
 			return {
 				content: [
 					{
 						type: "text",
-						text: `[COLONY_SIGNAL:LAUNCHED]\n🐜 Colony launched in background.\nGoal: ${params.goal}\n\nThe colony runs autonomously in passive mode. Progress is pushed via [COLONY_SIGNAL:*] follow-up messages. Do not poll bg_colony_status unless the user explicitly asks for a manual snapshot.`,
+						text: `[COLONY_SIGNAL:LAUNCHED] [${launchedId}]\n🐜 Colony [${launchedId}] launched in background (${colonies.size} active).\nGoal: ${params.goal}\n\nThe colony runs autonomously in passive mode. Progress is pushed via [COLONY_SIGNAL:*] follow-up messages. Do not poll bg_colony_status unless the user explicitly asks for a manual snapshot.`,
 					},
 				],
 			};
@@ -818,9 +853,17 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 			container.addChild(
 				new Text(theme.fg("success", "✓ ") + theme.fg("toolTitle", theme.bold("Colony launched in background")), 0, 0),
 			);
-			if (activeColony) {
-				container.addChild(new Text(theme.fg("muted", `  Goal: ${activeColony.goal.slice(0, 70)}`), 0, 0));
-				container.addChild(new Text(theme.fg("muted", "  Ctrl+Shift+A for details │ /colony-stop to cancel"), 0, 0));
+			if (colonies.size > 0) {
+				for (const colony of colonies.values()) {
+					container.addChild(new Text(theme.fg("muted", `  [${colony.id}] ${colony.goal.slice(0, 65)}`), 0, 0));
+				}
+				container.addChild(
+					new Text(
+						theme.fg("muted", `  ${colonies.size} active │ Ctrl+Shift+A for details │ /colony-stop to cancel`),
+						0,
+						0,
+					),
+				);
 			}
 			return container;
 		},
@@ -828,9 +871,8 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 
 	// ═══ Helper: build status summary ═══
 
-	function buildStatusText(): string {
-		if (!activeColony) return "No colony is currently running.";
-		const c = activeColony;
+	/** Build a status summary for a single colony. */
+	function buildColonyStatusText(c: BackgroundColony): string {
 		const state = c.state;
 		const elapsed = state ? formatDuration(Date.now() - state.createdAt) : "0s";
 		const m = state?.metrics;
@@ -853,15 +895,29 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 		return lines.join("\n");
 	}
 
+	/** Build a status summary for all running colonies. */
+	function buildStatusText(): string {
+		if (colonies.size === 0) return "No colonies are currently running.";
+		if (colonies.size === 1) {
+			const colony = colonies.values().next().value;
+			return colony ? buildColonyStatusText(colony) : "No colonies are currently running.";
+		}
+		const parts: string[] = [`${colonies.size} colonies running:\n`];
+		for (const colony of colonies.values()) {
+			parts.push(`── [${colony.id}] ──\n${buildColonyStatusText(colony)}\n`);
+		}
+		return parts.join("\n");
+	}
+
 	// ═══ Tool: bg_colony_status ═══
 	pi.registerTool({
 		name: "bg_colony_status",
 		label: "Colony Status",
 		description:
-			"Optional manual snapshot for a running colony. Progress is pushed passively via COLONY_SIGNAL follow-up messages; call this only when the user explicitly asks.",
+			"Optional manual snapshot for running colonies. Progress is pushed passively via COLONY_SIGNAL follow-up messages; call this only when the user explicitly asks.",
 		parameters: Type.Object({}),
 		async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
-			if (!activeColony) {
+			if (colonies.size === 0) {
 				return {
 					content: [{ type: "text" as const, text: "No colony is currently running." }],
 				};
@@ -906,11 +962,6 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 	pi.registerCommand("colony", {
 		description: "Launch an ant colony swarm to accomplish a goal",
 		async handler(args, ctx) {
-			if (activeColony) {
-				ctx.ui.notify("A colony is already running. Use /colony-stop to cancel it first.", "warning");
-				return;
-			}
-
 			const goal = args.trim();
 			if (!goal) {
 				ctx.ui.notify("Usage: /colony <goal> — describe what the colony should accomplish", "warning");
@@ -923,84 +974,155 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 				return;
 			}
 
-			launchBackgroundColony(
-				{
-					cwd: ctx.cwd,
-					goal,
-					currentModel,
-					modelOverrides: {},
-					modelRegistry: ctx.modelRegistry ?? undefined,
-				},
-				ctx,
+			const id = launchBackgroundColony({
+				cwd: ctx.cwd,
+				goal,
+				currentModel,
+				modelOverrides: {},
+				modelRegistry: ctx.modelRegistry ?? undefined,
+			});
+			ctx.ui.notify(
+				`🐜[${id}] Colony launched (${colonies.size} active): ${goal.slice(0, 70)}${goal.length > 70 ? "..." : ""}`,
+				"info",
 			);
-			ctx.ui.notify(`🐜 Colony launched: ${goal.slice(0, 80)}${goal.length > 80 ? "..." : ""}`, "info");
+		},
+	});
+
+	// ═══ Command: /colony-count ═══
+	pi.registerCommand("colony-count", {
+		description: "Show how many colonies are currently running",
+		async handler(_args, ctx) {
+			if (colonies.size === 0) {
+				ctx.ui.notify("No colonies running.", "info");
+			} else {
+				const ids = [...colonies.values()].map((c) => `[${c.id}] ${c.goal.slice(0, 50)}`).join("\n  ");
+				ctx.ui.notify(`${colonies.size} active ${colonies.size === 1 ? "colony" : "colonies"}:\n  ${ids}`, "info");
+			}
 		},
 	});
 
 	// ═══ Command: /colony-status ═══
 	pi.registerCommand("colony-status", {
-		description: "Show current colony progress",
-		async handler(_args, ctx) {
-			if (!activeColony) {
-				ctx.ui.notify("No colony is currently running.", "info");
+		description: "Show current colony progress (optionally specify ID: /colony-status c1)",
+		getArgumentCompletions(prefix) {
+			const items = [...colonies.keys()]
+				.filter((id) => id.startsWith(prefix))
+				.map((id) => {
+					const c = colonies.get(id);
+					return { value: id, label: `${id} — ${c?.goal.slice(0, 50) ?? ""}` };
+				});
+			return items.length > 0 ? items : null;
+		},
+		async handler(args, ctx) {
+			const idArg = args.trim() || undefined;
+			if (colonies.size === 0) {
+				ctx.ui.notify("No colonies are currently running.", "info");
 				return;
 			}
-			ctx.ui.notify(buildStatusText(), "info");
+			if (idArg) {
+				const colony = resolveColony(idArg);
+				if (!colony) {
+					ctx.ui.notify(`Colony "${idArg}" not found. Active: ${[...colonies.keys()].join(", ")}`, "warning");
+					return;
+				}
+				ctx.ui.notify(buildColonyStatusText(colony), "info");
+			} else {
+				ctx.ui.notify(buildStatusText(), "info");
+			}
 		},
 	});
 
 	// ═══ Command: /colony-stop ═══
 	pi.registerCommand("colony-stop", {
-		description: "Stop the running background colony",
-		async handler(_args, ctx) {
-			if (!activeColony) {
-				ctx.ui.notify("No colony is currently running.", "info");
+		description: "Stop a colony (specify ID, or stops all if none given)",
+		getArgumentCompletions(prefix) {
+			const items = [
+				{ value: "all", label: "all — Stop all running colonies" },
+				...[...colonies.keys()]
+					.filter((id) => id.startsWith(prefix))
+					.map((id) => {
+						const c = colonies.get(id);
+						return { value: id, label: `${id} — ${c?.goal.slice(0, 50) ?? ""}` };
+					}),
+			].filter((i) => i.value.startsWith(prefix));
+			return items.length > 0 ? items : null;
+		},
+		async handler(args, ctx) {
+			const idArg = args.trim() || undefined;
+			if (colonies.size === 0) {
+				ctx.ui.notify("No colonies are currently running.", "info");
 				return;
 			}
-			activeColony.abortController.abort();
-			ctx.ui.notify("🐜 Colony abort signal sent. Waiting for ants to finish...", "warning");
+			if (!idArg || idArg === "all") {
+				const count = colonies.size;
+				for (const colony of colonies.values()) {
+					colony.abortController.abort();
+				}
+				ctx.ui.notify(`🐜 Abort signal sent to ${count} ${count === 1 ? "colony" : "colonies"}.`, "warning");
+			} else {
+				const colony = resolveColony(idArg);
+				if (!colony) {
+					ctx.ui.notify(`Colony "${idArg}" not found. Active: ${[...colonies.keys()].join(", ")}`, "warning");
+					return;
+				}
+				colony.abortController.abort();
+				ctx.ui.notify(`🐜[${colony.id}] Abort signal sent. Waiting for ants to finish...`, "warning");
+			}
 		},
 	});
 
 	pi.registerCommand("colony-resume", {
-		description: "Resume a colony from its last checkpoint",
-		async handler(_args, ctx) {
-			if (activeColony) {
-				ctx.ui.notify("A colony is already running.", "warning");
+		description: "Resume colonies from their last checkpoint (resumes all resumable by default)",
+		async handler(args, ctx) {
+			const all = Nest.findAllResumable(ctx.cwd);
+			if (all.length === 0) {
+				ctx.ui.notify("No resumable colonies found.", "info");
 				return;
 			}
-			const found = Nest.findResumable(ctx.cwd);
-			if (!found) {
-				ctx.ui.notify("No resumable colony found.", "info");
+
+			// If an argument is given, try to match a specific colony ID
+			const target = args.trim();
+			const toResume = target ? all.filter((r) => r.colonyId === target) : [all[0]];
+
+			if (toResume.length === 0) {
+				ctx.ui.notify(`Colony "${target}" not found. Resumable: ${all.map((r) => r.colonyId).join(", ")}`, "warning");
 				return;
 			}
-			ctx.ui.notify(`🐜 Resuming colony: ${found.state.goal.slice(0, 60)}...`, "info");
-			launchBackgroundColony(
-				{
-					cwd: ctx.cwd,
-					goal: found.state.goal,
-					maxCost: found.state.maxCost ?? undefined,
-					currentModel: ctx.currentModel,
-					modelOverrides: {},
-					modelRegistry: ctx.modelRegistry,
-				},
-				true,
-			);
+
+			for (const found of toResume) {
+				const id = launchBackgroundColony(
+					{
+						cwd: ctx.cwd,
+						goal: found.state.goal,
+						maxCost: found.state.maxCost ?? undefined,
+						currentModel: ctx.currentModel,
+						modelOverrides: {},
+						modelRegistry: ctx.modelRegistry,
+					},
+					true,
+				);
+				ctx.ui.notify(`🐜[${id}] Resuming: ${found.state.goal.slice(0, 60)}...`, "info");
+			}
 		},
 	});
 
 	// ═══ Cleanup on shutdown ═══
 	pi.on("session_shutdown", async () => {
-		if (activeColony) {
-			activeColony.abortController.abort();
-			// Wait for colony to finish gracefully (max 5s)
+		if (colonies.size > 0) {
+			for (const colony of colonies.values()) {
+				colony.abortController.abort();
+			}
+			// Wait for all colonies to finish gracefully (max 5s)
 			try {
-				await Promise.race([activeColony.promise, new Promise((r) => setTimeout(r, 5000))]);
+				await Promise.race([
+					Promise.all([...colonies.values()].map((c) => c.promise)),
+					new Promise((r) => setTimeout(r, 5000)),
+				]);
 			} catch {
 				/* ignore */
 			}
 			pi.events.emit("ant-colony:clear-ui");
-			activeColony = null;
+			colonies.clear();
 		}
 	});
 }

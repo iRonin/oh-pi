@@ -494,7 +494,18 @@ export class Nest {
 	 * scouting, working, or reviewing and has no `finishedAt` timestamp).
 	 */
 	static findResumable(cwd: string): { colonyId: string; state: ColonyState } | null {
+		const all = Nest.findAllResumable(cwd);
+		return all.length > 0 ? all[0] : null;
+	}
+
+	/**
+	 * Find all resumable colonies in the working directory.
+	 * Returns colonies whose state is incomplete (not done/failed/budget_exceeded).
+	 * Sorted by `createdAt` descending so the most recent colony is first.
+	 */
+	static findAllResumable(cwd: string): Array<{ colonyId: string; state: ColonyState }> {
 		const parentDir = path.join(cwd, ".ant-colony");
+		const results: Array<{ colonyId: string; state: ColonyState }> = [];
 		try {
 			for (const dir of fs.readdirSync(parentDir)) {
 				const stateFile = path.join(parentDir, dir, "state.json");
@@ -508,13 +519,14 @@ export class Nest {
 					state.status !== "failed" &&
 					state.status !== "budget_exceeded"
 				) {
-					return { colonyId: dir, state };
+					results.push({ colonyId: dir, state });
 				}
 			}
 		} catch {
 			// No .ant-colony directory — nothing to resume
 		}
-		return null;
+		results.sort((a, b) => (b.state.createdAt ?? 0) - (a.state.createdAt ?? 0));
+		return results;
 	}
 
 	/**
