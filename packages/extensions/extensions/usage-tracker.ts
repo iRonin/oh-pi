@@ -142,6 +142,42 @@ function stripAnsi(text: string): string {
 	return text.replace(/\x1b\[[0-9;]*[A-Za-z]|\x1b\][^\x07]*\x07|\x1b\(B/g, "");
 }
 
+/** ANSI escape sequence pattern for character-by-character walking. */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape codes use control chars by definition
+const ANSI_RE = /\x1b\[[0-9;]*[A-Za-z]|\x1b\][^\x07]*\x07|\x1b\(B/g;
+
+/**
+ * Truncate a string containing ANSI codes to a given *visible* width.
+ * Walks the string character by character, skipping ANSI sequences when
+ * counting width, so color codes are preserved and the line is cut at the
+ * correct visual boundary.
+ */
+function truncateAnsi(line: string, width: number): string {
+	const visibleLength = stripAnsi(line).length;
+	if (visibleLength <= width) {
+		return line;
+	}
+
+	let visible = 0;
+	let i = 0;
+	while (i < line.length && visible < width) {
+		// Check if we're at the start of an ANSI sequence
+		ANSI_RE.lastIndex = i;
+		const match = ANSI_RE.exec(line);
+		if (match && match.index === i) {
+			// Skip the entire ANSI sequence (don't count toward visible width)
+			i += match[0].length;
+		} else {
+			// Regular visible character
+			visible++;
+			i++;
+		}
+	}
+
+	// Append a reset sequence in case we cut inside a styled region
+	return `${line.slice(0, i)}\x1b[0m`;
+}
+
 /**
  * Extract a percentage value from a line like "Current session  ███░░ 72% remaining"
  * or "5h limit  ▓▓▓░░ 45% left  resets in 2h 15m".
@@ -836,7 +872,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 					const lines = generateRichReport(ctx, theme);
 					return {
 						render(width: number) {
-							return lines.map((line) => (line.length > width ? line.slice(0, width) : line));
+							return lines.map((line) => truncateAnsi(line, width));
 						},
 						handleInput(data: string) {
 							if (data === "q" || data === "\x1b" || data === "\r" || data === " ") {
@@ -942,7 +978,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 					const lines = generateRichReport(ctx, theme);
 					return {
 						render(width: number) {
-							return lines.map((line) => (line.length > width ? line.slice(0, width) : line));
+							return lines.map((line) => truncateAnsi(line, width));
 						},
 						handleInput(data: string) {
 							if (data === "q" || data === "\x1b" || data === "\r" || data === " ") {
