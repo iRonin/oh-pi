@@ -5,10 +5,10 @@
 ### Features
 
 - rewrite configuration wizard UX
-- monorepo restructure under @ifi/* scope
+- monorepo restructure under @ifiokjr/* scope
 - detailed changesets, markdown formatting, knope publish workflow
 
-#### `@ifi/oh-pi-agents` — Initial release
+#### `@ifiokjr/oh-pi-agents` — Initial release
 
 5 AGENTS.md templates providing role-specific AI guidelines.
 
@@ -23,7 +23,7 @@
 
 Each template is a markdown file placed at `~/.pi/agent/AGENTS.md` to guide the AI's behavior.
 
-#### `@ifi/oh-pi-ant-colony` — Initial release
+#### `@ifiokjr/oh-pi-ant-colony` — Initial release
 
 Multi-agent swarm extension modeled after real ant ecology.
 
@@ -51,7 +51,7 @@ Multi-agent swarm extension modeled after real ant ecology.
 - **Auto-trigger**: LLM deploys colony when ≥3 files need changes or parallel workstreams are
   possible
 
-#### `@ifi/oh-pi-cli` — Initial release
+#### `@ifiokjr/oh-pi-cli` — Initial release
 
 Interactive TUI configurator that sets up `~/.pi/agent/` in under a minute.
 
@@ -65,9 +65,9 @@ Interactive TUI configurator that sets up `~/.pi/agent/` in under a minute.
   `AGENTS.md`, and copies extension/theme/prompt/skill files into `~/.pi/agent/`
 - **Backup detection**: Warns when existing configuration exists and offers timestamped backup
   before overwriting
-- **Binary entry point**: Ships as `oh-pi` CLI via `npx @ifi/oh-pi-cli`
+- **Binary entry point**: Ships as `oh-pi` CLI via `npx @ifiokjr/oh-pi-cli`
 
-#### `@ifi/oh-pi-core` — Initial release
+#### `@ifiokjr/oh-pi-core` — Initial release
 
 Shared foundation library for all oh-pi packages.
 
@@ -85,7 +85,7 @@ Shared foundation library for all oh-pi packages.
 - **Preset system**: Pre-configured profiles (Full Power, Clean, Colony Only) mapping to curated
   extension/theme/thinking-level combinations
 
-#### `@ifi/oh-pi-extensions` — Initial release
+#### `@ifiokjr/oh-pi-extensions` — Initial release
 
 9 pi extensions that hook into the pi SDK event system.
 
@@ -111,7 +111,7 @@ Shared foundation library for all oh-pi packages.
 
 #### Infrastructure and tooling
 
-- **Monorepo**: pnpm workspace with 9 packages under `@ifi/*` npm scope
+- **Monorepo**: pnpm workspace with 9 packages under `@ifiokjr/*` npm scope
 - **Biome**: Strict linting and formatting (tabs, 120 char width, double quotes, organized imports)
 - **tsgo**: `@typescript/native-preview` (official TypeScript 7.0 Go port) for fast type checking
 - **GitHub Actions CI**: lint → typecheck → test (Node 20 + 22) → build pipeline with changeset
@@ -122,20 +122,20 @@ Shared foundation library for all oh-pi packages.
 - **All documentation translated to English**: 8 main docs, supplementary docs, benchmarks,
   ant-colony README, and 16+ source file comments
 
-#### `@ifi/oh-pi` — Initial release
+#### `@ifiokjr/oh-pi` — Initial release
 
 Meta-package that bundles all oh-pi packages for one-command installation.
 
-- **Single install**: `pi install npm:@ifi/oh-pi` adds all extensions, themes, prompts, skills, and
+- **Single install**: `pi install npm:@ifiokjr/oh-pi` adds all extensions, themes, prompts, skills, and
   agents templates
 - **Bundled dependencies**: All sub-packages are listed as `bundledDependencies` so pi gets
   everything in one `npm install`
 - **Pi package manifest**: Declares extension, theme, prompt, and skill paths via the `pi` field so
   pi auto-discovers all resources
-- **Transitive packages**: Pulls in `@ifi/oh-pi-extensions`, `@ifi/oh-pi-ant-colony`,
-  `@ifi/oh-pi-themes`, `@ifi/oh-pi-prompts`, `@ifi/oh-pi-skills`, and `@ifi/oh-pi-agents`
+- **Transitive packages**: Pulls in `@ifiokjr/oh-pi-extensions`, `@ifiokjr/oh-pi-ant-colony`,
+  `@ifiokjr/oh-pi-themes`, `@ifiokjr/oh-pi-prompts`, `@ifiokjr/oh-pi-skills`, and `@ifiokjr/oh-pi-agents`
 
-#### `@ifi/oh-pi-prompts` — Initial release
+#### `@ifiokjr/oh-pi-prompts` — Initial release
 
 10 markdown prompt templates for common development tasks.
 
@@ -151,9 +151,9 @@ Meta-package that bundles all oh-pi packages for one-command installation.
 - `/document` — Generate inline documentation and README sections
 
 Each template is a markdown file that pi loads as a slash command. Install via
-`pi install npm:@ifi/oh-pi-prompts`.
+`pi install npm:@ifiokjr/oh-pi-prompts`.
 
-#### `@ifi/oh-pi-skills` — Initial release
+#### `@ifiokjr/oh-pi-skills` — Initial release
 
 10 skill packs across three categories.
 
@@ -177,9 +177,9 @@ Each template is a markdown file that pi loads as a slash command. Install via
 - `git-workflow` — Branching, commits, PRs, and conflict resolution
 
 Each skill directory contains a `SKILL.md` manifest and supporting files. Install via
-`pi install npm:@ifi/oh-pi-skills`.
+`pi install npm:@ifiokjr/oh-pi-skills`.
 
-#### `@ifi/oh-pi-themes` — Initial release
+#### `@ifiokjr/oh-pi-themes` — Initial release
 
 6 color themes for pi's terminal UI.
 
@@ -191,7 +191,7 @@ Each skill directory contains a `SKILL.md` manifest and supporting files. Instal
 - **Gruvbox Dark** — Warm retro tones from the classic Gruvbox color scheme
 
 All themes are JSON files compatible with pi's `settings.json` theme configuration. Install via
-`pi install npm:@ifi/oh-pi-themes`.
+`pi install npm:@ifiokjr/oh-pi-themes`.
 
 ### Fixes
 
@@ -202,7 +202,7 @@ All themes are JSON files compatible with pi's `settings.json` theme configurati
 
 ### Features
 
-- Monorepo split into 9 packages under `@ifi/*` scope
+- Monorepo split into 9 packages under `@ifiokjr/*` scope
 - Added `usage-tracker` extension with CodexBar-inspired rate limit monitoring
 - Integrated tsgo (`@typescript/native-preview`) for fast type checking
 - Added Biome for strict linting and formatting

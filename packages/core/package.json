@@ -1,5 +1,5 @@
 {
-  "name": "@ifi/oh-pi-core",
+  "name": "@ifiokjr/oh-pi-core",
   "version": "0.2.1",
   "description": "Shared types, registries, and i18n for oh-pi packages.",
   "type": "module",

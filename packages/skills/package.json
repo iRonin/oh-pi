@@ -1,5 +1,5 @@
 {
-  "name": "@ifi/oh-pi-skills",
+  "name": "@ifiokjr/oh-pi-skills",
   "version": "0.2.1",
   "description": "On-demand skill packs for pi: web-search, debug-helper, git-workflow, and more.",
   "keywords": [
