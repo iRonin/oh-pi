@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.3 (2026-03-08)
+
+### Features
+
+- rewrite configuration wizard UX
+- monorepo restructure under @ifi/* scope
+- detailed changesets, markdown formatting, knope publish workflow
+
+### Fixes
+
+- CI builds core before typecheck and tests
+- remove composite/references, use plain tsgo resolution
+- rename npm scope from @ifi to @ifiokjr
+- revert npm scope back to @ifi
+
+#### Reverted npm scope back to `@ifi`
+
+The scope was incorrectly changed to `@ifiokjr` due to a misdiagnosed npm auth issue.
+The real problem was token permissions, not the scope name. All packages are back to `@ifi/*`.
+
 ## 0.2.2 (2026-03-08)
 
 ### Features
