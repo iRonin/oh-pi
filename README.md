@@ -46,7 +46,7 @@ meta-package.
 | [`@ifi/oh-pi-ant-colony`](./packages/ant-colony) | Multi-agent swarm extension             | `pi install npm:@ifi/oh-pi-ant-colony` |
 | [`@ifi/oh-pi-themes`](./packages/themes)         | 6 color themes                          | `pi install npm:@ifi/oh-pi-themes`     |
 | [`@ifi/oh-pi-prompts`](./packages/prompts)       | 10 prompt templates                     | `pi install npm:@ifi/oh-pi-prompts`    |
-| [`@ifi/oh-pi-skills`](./packages/skills)         | 11 skill packs                          | `pi install npm:@ifi/oh-pi-skills`     |
+| [`@ifi/oh-pi-skills`](./packages/skills)         | 12 skill packs                          | `pi install npm:@ifi/oh-pi-skills`     |
 | [`@ifi/oh-pi-agents`](./packages/agents)         | 5 AGENTS.md templates                   | (used by CLI only)                     |
 
 ---
@@ -314,6 +314,7 @@ Anthropic · OpenAI · Google Gemini · Groq · OpenRouter · xAI · Mistral
 | `debug-helper`             | Error analysis, log interpretation, profiling       |
 | `git-workflow`             | Branching, commits, PRs, conflict resolution        |
 | `rust-workspace-bootstrap` | Scaffold Rust workspaces with knope, devenv, CI/CD  |
+| `flutter-serverpod-mvp`    | Scaffold full-stack Flutter + Serverpod MVPs        |
 
 ## Themes
 
@@ -410,7 +411,7 @@ oh-pi/
 │   ├── ant-colony/        Multi-agent swarm extension (raw .ts)
 │   ├── themes/            6 JSON theme files
 │   ├── prompts/           10 markdown prompt templates
-│   ├── skills/            11 skill directories
+│   ├── skills/            12 skill directories
 │   ├── agents/            5 AGENTS.md templates
 │   └── oh-pi/             Meta-package (bundles everything)
 ├── docs/                  Full documentation
