@@ -3,7 +3,10 @@
 	"version": "0.2.11",
 	"description": "One-click setup for pi-coding-agent — extensions, themes, prompts, skills, and ant-colony swarm. Like oh-my-zsh for pi.",
 	"keywords": ["pi-package", "pi-coding-agent", "configuration", "setup", "tui"],
-	"files": ["README.md"],
+	"bin": {
+		"oh-pi": "bin/oh-pi.mjs"
+	},
+	"files": ["bin", "README.md"],
 	"license": "MIT",
 	"dependencies": {
 		"@ifi/oh-pi-extensions": "workspace:*",

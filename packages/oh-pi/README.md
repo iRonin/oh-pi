@@ -4,20 +4,20 @@
 
 ## Install
 
-Install each package directly so pi can load extensions with proper module resolution:
-
 ```bash
-pi install npm:@ifi/oh-pi-extensions
-pi install npm:@ifi/oh-pi-ant-colony
-pi install npm:@ifi/oh-pi-themes
-pi install npm:@ifi/oh-pi-prompts
-pi install npm:@ifi/oh-pi-skills
+npx @ifi/oh-pi
 ```
 
-Or install everything at once:
+This registers all oh-pi packages with pi in one command. Each package is installed separately so pi
+can load extensions with proper module resolution.
+
+### Options
 
 ```bash
-pi install npm:@ifi/oh-pi-extensions && pi install npm:@ifi/oh-pi-ant-colony && pi install npm:@ifi/oh-pi-themes && pi install npm:@ifi/oh-pi-prompts && pi install npm:@ifi/oh-pi-skills
+npx @ifi/oh-pi                      # install latest versions (global)
+npx @ifi/oh-pi --version 0.2.11     # pin to a specific version
+npx @ifi/oh-pi --local              # install to project .pi/settings.json
+npx @ifi/oh-pi --remove             # uninstall all oh-pi packages from pi
 ```
 
 ## Packages
