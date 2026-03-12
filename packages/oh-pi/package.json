@@ -37,5 +37,12 @@
     "@ifi/oh-pi-skills": "workspace:*",
     "@ifi/oh-pi-agents": "workspace:*"
   },
-  "bundleDependencies": false
+  "bundledDependencies": [
+    "@ifi/oh-pi-extensions",
+    "@ifi/oh-pi-ant-colony",
+    "@ifi/oh-pi-themes",
+    "@ifi/oh-pi-prompts",
+    "@ifi/oh-pi-skills",
+    "@ifi/oh-pi-agents"
+  ]
 }
