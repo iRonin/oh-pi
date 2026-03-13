@@ -9,6 +9,7 @@ export default defineConfig({
 			"packages/subagents/tests/**/*.test.ts",
 			"packages/plan/tests/**/*.test.ts",
 			"packages/shared-qna/tests/**/*.test.ts",
+			"packages/spec/tests/**/*.test.ts",
 		],
 	},
 });

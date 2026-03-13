@@ -1,0 +1,47 @@
+{
+	"name": "@ifi/pi-spec",
+	"version": "0.2.13",
+	"description": "Native spec-kit workflow for pi with a /spec command, TypeScript scaffolding, and spec-driven prompts.",
+	"type": "module",
+	"keywords": [
+		"pi-package",
+		"pi",
+		"pi-coding-agent",
+		"spec",
+		"spec-kit",
+		"planning",
+		"requirements"
+	],
+	"pi": {
+		"extensions": [
+			"./extension"
+		]
+	},
+	"files": [
+		"extension",
+		"README.md",
+		"!**/*.test.ts"
+	],
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/ifiokjr/oh-pi.git",
+		"directory": "packages/spec"
+	},
+	"homepage": "https://github.com/ifiokjr/oh-pi/tree/main/packages/spec",
+	"bugs": {
+		"url": "https://github.com/ifiokjr/oh-pi/issues"
+	},
+	"scripts": {
+		"build": "pnpm run typecheck && pnpm run test:worktree",
+		"typecheck": "tsgo --project ./tsconfig.json --noEmit",
+		"test:worktree": "vitest run --config ./vitest.worktree.config.ts"
+	},
+	"peerDependencies": {
+		"@mariozechner/pi-agent-core": "*",
+		"@mariozechner/pi-ai": "*",
+		"@mariozechner/pi-coding-agent": "*",
+		"@mariozechner/pi-tui": "*",
+		"@sinclair/typebox": "*"
+	}
+}

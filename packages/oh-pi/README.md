@@ -28,8 +28,9 @@ npx @ifi/oh-pi --remove             # uninstall all oh-pi packages from pi
 | `@ifi/oh-pi-ant-colony`       | Multi-agent swarm extension (`/colony`, colony commands)                                     |
 | `@ifi/pi-extension-subagents` | Subagent orchestration extension (`subagent`, `subagent_status`, `/run`, `/chain`, `/parallel`) |
 | `@ifi/pi-plan`                | Planning mode extension (`/plan`, `Alt+P`, `task_agents`, `set_plan`)                       |
+| `@ifi/pi-spec`                | Native spec-driven workflow package with `/spec` and local `.specify/` scaffolding          |
 | `@ifi/oh-pi-themes`           | cyberpunk, nord, gruvbox, tokyo-night, catppuccin, oh-p-dark                                 |
-| `@ifi/oh-pi-prompts`         | review, fix, explain, refactor, test, commit, pr, and more                                  |
+| `@ifi/oh-pi-prompts`          | review, fix, explain, refactor, test, commit, pr, and more                                  |
 | `@ifi/oh-pi-skills`          | web-search, debug-helper, git-workflow, rust-workspace-bootstrap, and more                  |
 | `@ifi/oh-pi-agents`          | AGENTS.md templates for common roles                                                        |
 

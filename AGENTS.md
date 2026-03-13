@@ -105,6 +105,7 @@ packages/
   subagents/              → @ifi/pi-extension-subagents (raw .ts: subagent orchestration package)
   shared-qna/             → @ifi/pi-shared-qna (shared TUI helper library)
   plan/                   → @ifi/pi-plan (raw .ts: planning mode extension)
+  spec/                   → @ifi/pi-spec (raw .ts: native spec-driven workflow package)
   oh-pi/                  → @ifi/oh-pi (installer CLI: `npx @ifi/oh-pi`)
 ```
 
@@ -133,6 +134,7 @@ pi install npm:@ifi/oh-pi-prompts
 pi install npm:@ifi/oh-pi-skills
 pi install npm:@ifi/pi-extension-subagents
 pi install npm:@ifi/pi-plan
+pi install npm:@ifi/pi-spec
 ```
 
 **Do not use `bundledDependencies`** in the oh-pi package — pnpm's isolated linker does not support
@@ -144,6 +146,8 @@ it, and npm hoists bundled deps away from `node_modules/` paths that the `pi` fi
 - **Core and CLI are compiled** — they produce `dist/` via tsc
 - **Imports**: CLI imports from `@ifi/oh-pi-core`, not relative paths. Extensions import from
   pi SDK packages.
+- **Spec package layout**: `@ifi/pi-spec` keeps project state in `.specify/` and per-feature artifacts in
+  `specs/###-feature-name/`.
 - **`noDefaultExport: off`** — extensions use default exports as their API pattern
 - **Test files**: Relaxed lint rules (no explicit any, no unused vars, etc.)
 - **Ant colony workspace default**: ant-colony runs use isolated git worktrees by default, with

@@ -73,6 +73,9 @@ importers:
       '@ifi/oh-pi-themes':
         specifier: workspace:*
         version: link:../themes
+      '@ifi/pi-spec':
+        specifier: workspace:*
+        version: link:../spec
       chalk:
         specifier: ^5.6.2
         version: 5.6.2
@@ -133,6 +136,9 @@ importers:
       '@ifi/pi-plan':
         specifier: workspace:*
         version: link:../plan
+      '@ifi/pi-spec':
+        specifier: workspace:*
+        version: link:../spec
 
   packages/plan:
     dependencies:
@@ -167,6 +173,24 @@ importers:
         version: 0.56.1
 
   packages/skills: {}
+
+  packages/spec:
+    dependencies:
+      '@mariozechner/pi-agent-core':
+        specifier: '*'
+        version: 0.56.1(ws@8.19.0)(zod@3.25.76)
+      '@mariozechner/pi-ai':
+        specifier: '*'
+        version: 0.56.1(ws@8.19.0)(zod@3.25.76)
+      '@mariozechner/pi-coding-agent':
+        specifier: '*'
+        version: 0.56.1(ws@8.19.0)(zod@3.25.76)
+      '@mariozechner/pi-tui':
+        specifier: '*'
+        version: 0.56.1
+      '@sinclair/typebox':
+        specifier: '*'
+        version: 0.34.48
 
   packages/subagents:
     dependencies:

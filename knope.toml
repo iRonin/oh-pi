@@ -18,6 +18,7 @@ versioned_files = [
   "packages/subagents/package.json",
   "packages/shared-qna/package.json",
   "packages/plan/package.json",
+  "packages/spec/package.json",
   "packages/oh-pi/package.json",
 ]
 changelog = "CHANGELOG.md"

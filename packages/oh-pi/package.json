@@ -22,6 +22,7 @@
     "@ifi/oh-pi-ant-colony": "workspace:*",
     "@ifi/pi-extension-subagents": "workspace:*",
     "@ifi/pi-plan": "workspace:*",
+    "@ifi/pi-spec": "workspace:*",
     "@ifi/oh-pi-themes": "workspace:*",
     "@ifi/oh-pi-prompts": "workspace:*",
     "@ifi/oh-pi-skills": "workspace:*",

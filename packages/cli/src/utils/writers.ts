@@ -202,11 +202,18 @@ export function writeExtensions(agentDir: string, config: OhPConfig) {
 	const extDir = join(agentDir, "extensions");
 	ensureDir(extDir);
 	for (const ext of config.extensions) {
-		// ant-colony lives in its own package
+		// ant-colony and spec live in dedicated packages
 		if (ext === "ant-colony") {
 			const colonySrc = resources.antColonyDir();
 			if (existsSync(colonySrc)) {
 				syncDir(colonySrc, join(extDir, "ant-colony"));
+			}
+			continue;
+		}
+		if (ext === "spec") {
+			const specSrc = resources.specDir();
+			if (existsSync(specSrc)) {
+				syncDir(specSrc, join(extDir, "spec"));
 			}
 			continue;
 		}

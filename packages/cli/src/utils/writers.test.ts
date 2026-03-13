@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { OhPConfig } from "@ifi/oh-pi-core";
 import { afterEach, describe, expect, it } from "vitest";
-import { writeAgents, writeModelConfig, writeProviderEnv } from "./writers.js";
+import { writeAgents, writeExtensions, writeModelConfig, writeProviderEnv } from "./writers.js";
 
 const tempDirs: string[] = [];
 
@@ -30,6 +30,21 @@ afterEach(() => {
 	for (const dir of tempDirs.splice(0)) {
 		rmSync(dir, { recursive: true, force: true });
 	}
+});
+
+describe("writeExtensions", () => {
+	it("copies the dedicated spec package into the local extensions directory", () => {
+		const dir = makeTempDir();
+		writeExtensions(
+			dir,
+			makeConfig({
+				extensions: ["spec"],
+			}),
+		);
+
+		expect(existsSync(join(dir, "extensions", "spec", "index.ts"))).toBe(true);
+		expect(existsSync(join(dir, "extensions", "spec", "assets", "templates", "spec-template.md"))).toBe(true);
+	});
 });
 
 describe("writeAgents", () => {

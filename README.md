@@ -45,10 +45,24 @@ This is a monorepo. Install everything at once with `npx @ifi/oh-pi`, or pick in
 | [`@ifi/pi-extension-subagents`](./packages/subagents)     | Full-featured subagent delegation extension | `pi install npm:@ifi/pi-extension-subagents` |
 | [`@ifi/pi-plan`](./packages/plan)                         | Branch-aware planning mode extension        | `pi install npm:@ifi/pi-plan`               |
 | [`@ifi/pi-shared-qna`](./packages/shared-qna)             | Shared Q&A TUI helpers                      | (library, not installed directly)           |
+| [`@ifi/pi-spec`](./packages/spec)                         | Native spec-driven workflow with `/spec`    | `pi install npm:@ifi/pi-spec`               |
 | [`@ifi/oh-pi-themes`](./packages/themes)                  | 6 color themes                              | `pi install npm:@ifi/oh-pi-themes`          |
 | [`@ifi/oh-pi-prompts`](./packages/prompts)                | 10 prompt templates                         | `pi install npm:@ifi/oh-pi-prompts`         |
 | [`@ifi/oh-pi-skills`](./packages/skills)                  | 12 skill packs                              | `pi install npm:@ifi/oh-pi-skills`          |
 | [`@ifi/oh-pi-agents`](./packages/agents)                  | 5 AGENTS.md templates                       | (used by CLI only)                          |
+
+### Native `/spec` Workflow
+
+```bash
+/spec init
+/spec constitution Security-first, testable, minimal-complexity defaults
+/spec specify Build a native spec workflow package for pi
+/spec clarify
+/spec plan Use TypeScript, Vitest, and direct pi tool access
+/spec tasks
+/spec analyze
+/spec implement
+```
 
 ### Installer Options
 
@@ -438,6 +452,7 @@ oh-pi/
 │   ├── subagents/              Subagent orchestration package (raw .ts)
 │   ├── shared-qna/             Shared Q&A TUI helper library (raw .ts)
 │   ├── plan/                   Planning mode extension (raw .ts)
+│   ├── spec/                   Native spec-driven workflow package (raw .ts)
 │   ├── themes/                 6 JSON theme files
 │   ├── prompts/                10 markdown prompt templates
 │   ├── skills/                 12 skill directories
