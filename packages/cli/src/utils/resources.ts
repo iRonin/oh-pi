@@ -26,6 +26,7 @@ export const resources = {
 	extension: (name: string) => join(resolvePackagePath("@ifi/oh-pi-extensions", "extensions"), name),
 	extensionFile: (name: string) => join(resolvePackagePath("@ifi/oh-pi-extensions", "extensions"), `${name}.ts`),
 	antColonyDir: () => resolvePackagePath("@ifi/oh-pi-ant-colony", "extensions/ant-colony"),
+	specDir: () => resolvePackagePath("@ifi/pi-spec", "extension"),
 	prompt: (name: string) => join(resolvePackagePath("@ifi/oh-pi-prompts", "prompts"), `${name}.md`),
 	skill: (name: string) => join(resolvePackagePath("@ifi/oh-pi-skills", "skills"), name),
 	skillsDir: () => resolvePackagePath("@ifi/oh-pi-skills", "skills"),

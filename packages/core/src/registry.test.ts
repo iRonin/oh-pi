@@ -74,6 +74,12 @@ describe("EXTENSIONS", () => {
 		expect(safeGuard).toBeDefined();
 		expect(safeGuard?.default).toBe(false);
 	});
+
+	it("exposes the optional spec workflow extension", () => {
+		const spec = EXTENSIONS.find((ext) => ext.name === "spec");
+		expect(spec).toBeDefined();
+		expect(spec?.default).toBe(false);
+	});
 });
 
 describe("KEYBINDING_SCHEMES", () => {

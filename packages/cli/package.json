@@ -29,6 +29,7 @@
     "@ifi/oh-pi-prompts": "workspace:*",
     "@ifi/oh-pi-skills": "workspace:*",
     "@ifi/oh-pi-themes": "workspace:*",
+    "@ifi/pi-spec": "workspace:*",
     "chalk": "^5.6.2"
   },
   "engines": {

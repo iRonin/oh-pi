@@ -16,7 +16,9 @@
 			"packages/ant-colony/tests/**/*.ts",
 			"packages/subagents/tests/**/*.ts",
 			"packages/plan/tests/**/*.ts",
-			"packages/shared-qna/tests/**/*.ts"
+			"packages/shared-qna/tests/**/*.ts",
+			"packages/spec/extension/**/*.ts",
+			"packages/spec/tests/**/*.ts"
 		]
 	},
 	"formatter": {

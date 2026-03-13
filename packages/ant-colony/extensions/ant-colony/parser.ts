@@ -41,10 +41,7 @@ function normalizeCaste(v: unknown): AntCaste {
 }
 
 function extractFileLike(value: string): string[] {
-	const normalized = value
-		.replace(/;/g, ",")
-		.replace(/["']/g, "")
-		.replace(/`/g, "");
+	const normalized = value.replace(/;/g, ",").replace(/["']/g, "").replace(/`/g, "");
 	const tokens = normalized
 		.split(",")
 		.map((s) => s.trim())

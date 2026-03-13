@@ -74,6 +74,11 @@ export const EXTENSIONS = [
 		label: "🐜 Ant Colony — Autonomous multi-agent swarm with adaptive concurrency",
 		default: false,
 	},
+	{
+		name: "spec",
+		label: "📐 Spec Workflow — Native spec-driven planning and implementation via /spec",
+		default: false,
+	},
 	{ name: "auto-update", label: "🔄 Auto Update — Check for oh-pi updates on startup and notify", default: true },
 	{
 		name: "bg-process",
