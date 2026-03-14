@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.3.0 (2026-03-14)
+
+### Breaking Changes
+
+#### Add remote web management for pi instances.
+
+Introduces three new packages for controlling a pi session from any browser or mobile device:
+
+- `@ifi/pi-web-server` — Embeddable HTTP + WebSocket server that bridges a pi `AgentSession` to remote clients with token-based auth, auto-tunnel detection (cloudflared/tailscale), and QR code generation.
+- `@ifi/pi-web-remote` — Pi extension that registers the `/remote` command. One command, zero config: starts the server, auto-detects connectivity, and displays a QR code to scan.
+- `@ifi/pi-web-client` — Platform-agnostic TypeScript client library (zero dependencies) that works in browsers, React Native, and Node.js.
+
+Also includes a headless daemon mode (`pi-web serve`) for long-running always-on instances.
+
+### Features
+
+- add creative and multimodal builtin agents
+- replace CLI probing with direct API auth in usage-tracker
+- add web server, client, and /remote extension
+- Replace CLI-based rate limit probing with direct API calls using pi-managed auth tokens. The usage-tracker extension no longer shells out to external `claude` or `codex` CLI tools. Instead, it reads OAuth credentials from `~/.pi/agent/auth.json` and queries provider APIs directly (Anthropic, OpenAI, Google). Adds Google provider support. Updates `/usage` overlay, widget, and `Ctrl+U` dashboard to probe all configured providers.
+
+#### Add new builtin subagents for creative and multimodal tasks.
+
+- add an `artist` agent tuned for SVG creation and concrete visual asset briefs using `gemini-3.1-pro-high`
+- add a `frontend-designer` agent tuned for distinctive, production-grade UI implementation using `claude-opus-4-6`
+- add a `multimodal-summariser` agent tuned for summarizing image, audio, and video inputs using `gemini-3-flash`
+- document the new builtin agents and cover their bundled discovery in tests
+
+### Fixes
+
+- Fix remaining unscoped `npx oh-pi` references in `docs/DESIGN.md` to use `npx @ifi/oh-pi`.
+
 ## 0.2.16 (2026-03-14)
 
 ### Fixes

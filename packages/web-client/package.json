@@ -1,28 +1,28 @@
 {
-	"name": "@ifi/pi-web-client",
-	"version": "0.2.16",
-	"description": "Platform-agnostic TypeScript client for pi-web remote sessions. Zero dependencies.",
-	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"import": "./dist/index.js"
-		}
-	},
-	"files": [
-		"dist",
-		"README.md"
-	],
-	"scripts": {
-		"clean": "node -e \"import('node:fs').then(fs => fs.rmSync('dist',{ recursive: true, force: true }))\"",
-		"build": "pnpm clean && tsc --project tsconfig.json",
-		"build:fast": "pnpm clean && tsgo --project tsconfig.json",
-		"typecheck": "tsgo --project tsconfig.json --noEmit"
-	},
-	"license": "MIT",
-	"engines": {
-		"node": ">=20.0.0"
-	}
+  "name": "@ifi/pi-web-client",
+  "version": "0.3.0",
+  "description": "Platform-agnostic TypeScript client for pi-web remote sessions. Zero dependencies.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "clean": "node -e \"import('node:fs').then(fs => fs.rmSync('dist',{ recursive: true, force: true }))\"",
+    "build": "pnpm clean && tsc --project tsconfig.json",
+    "build:fast": "pnpm clean && tsgo --project tsconfig.json",
+    "typecheck": "tsgo --project tsconfig.json --noEmit"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  }
 }

@@ -1,31 +1,31 @@
 {
-	"name": "@ifi/pi-web-remote",
-	"version": "0.2.16",
-	"description": "Pi extension: /remote command for sharing sessions via web UI.",
-	"type": "module",
-	"keywords": [
-		"pi-package",
-		"pi",
-		"pi-coding-agent",
-		"remote",
-		"web"
-	],
-	"pi": {
-		"extensions": [
-			"./index.ts"
-		]
-	},
-	"files": [
-		"*.ts",
-		"README.md",
-		"!*.test.ts"
-	],
-	"license": "MIT",
-	"dependencies": {
-		"@ifi/pi-web-server": "workspace:*"
-	},
-	"peerDependencies": {
-		"@mariozechner/pi-coding-agent": "*",
-		"@sinclair/typebox": "*"
-	}
+  "name": "@ifi/pi-web-remote",
+  "version": "0.3.0",
+  "description": "Pi extension: /remote command for sharing sessions via web UI.",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "remote",
+    "web"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "files": [
+    "*.ts",
+    "README.md",
+    "!*.test.ts"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@ifi/pi-web-server": "workspace:*"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@sinclair/typebox": "*"
+  }
 }
