@@ -902,7 +902,7 @@ describe("usage-tracker extension", () => {
 			expect(widgetFactory).toBeDefined();
 			const component = widgetFactory?.({ requestRender: vi.fn() }, { fg: (_color: string, text: string) => text });
 			const rendered = component?.render(200).join("\n") ?? "";
-			expect(rendered).toContain("💰");
+			expect(rendered).toContain("$");
 			expect(rendered).toContain("30d:");
 		});
 

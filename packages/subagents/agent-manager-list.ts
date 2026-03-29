@@ -201,7 +201,7 @@ export function renderList(
 
 			const cursorChar = isCursor ? theme.fg("accent", "▸") : " ";
 			const selectBadge =
-				count > 1 ? theme.fg("accent", `×${count}`.padStart(2)) : count === 1 ? theme.fg("accent", " ✓") : "  ";
+				count > 1 ? theme.fg("accent", `×${count}`.padStart(2)) : count === 1 ? theme.fg("accent", " +") : "  ";
 			const shadowMarker = isShadowed ? theme.fg("warning", "●") : " ";
 			const prefix = `${cursorChar}${selectBadge}${shadowMarker} `;
 

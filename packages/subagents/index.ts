@@ -717,11 +717,11 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 						const hasOutput = Boolean(output?.trim());
 						const status =
 							r.exitCode !== 0
-								? `⚠️ FAILED (exit code ${r.exitCode})${r.error ? `: ${r.error}` : ""}`
+								? `[!] FAILED (exit code ${r.exitCode})${r.error ? `: ${r.error}` : ""}`
 								: r.error
-									? `⚠️ WARNING: ${r.error}`
+									? `[!] WARNING: ${r.error}`
 									: !hasOutput
-										? "⚠️ EMPTY OUTPUT"
+										? "[!] EMPTY OUTPUT"
 										: "";
 						const body = status ? (hasOutput ? `${status}\n${output}` : status) : output;
 						return `${header}\n${body}`;

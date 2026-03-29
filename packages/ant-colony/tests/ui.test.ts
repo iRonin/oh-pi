@@ -1,8 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { ColonyState } from "../extensions/ant-colony/types.js";
 import {
+	antIcon,
+	boltIcon,
 	buildReport,
 	casteIcon,
+	checkMark,
+	crossMark,
 	formatCost,
 	formatDuration,
 	formatTokens,
@@ -34,6 +38,10 @@ describe("formatTokens", () => {
 });
 
 describe("statusIcon", () => {
+	afterEach(() => {
+		process.env.OH_PI_PLAIN_ICONS = "";
+	});
+
 	it("launched", () => expect(statusIcon("launched")).toBe("🚀"));
 	it("scouting", () => expect(statusIcon("scouting")).toBe("🔍"));
 	it("working", () => expect(statusIcon("working")).toBe("⚒️"));
@@ -44,6 +52,19 @@ describe("statusIcon", () => {
 	it("failed", () => expect(statusIcon("failed")).toBe("❌"));
 	it("budget_exceeded", () => expect(statusIcon("budget_exceeded")).toBe("💰"));
 	it("unknown", () => expect(statusIcon("xyz")).toBe("🐜"));
+
+	it("plain mode: launched", () => {
+		process.env.OH_PI_PLAIN_ICONS = "1";
+		expect(statusIcon("launched")).toBe("[>>]");
+	});
+	it("plain mode: scouting", () => {
+		process.env.OH_PI_PLAIN_ICONS = "1";
+		expect(statusIcon("scouting")).toBe("[?]");
+	});
+	it("plain mode: unknown", () => {
+		process.env.OH_PI_PLAIN_ICONS = "1";
+		expect(statusIcon("xyz")).toBe("[ant]");
+	});
 });
 
 describe("statusLabel", () => {
@@ -62,14 +83,71 @@ describe("progressBar", () => {
 });
 
 describe("casteIcon", () => {
+	afterEach(() => {
+		process.env.OH_PI_PLAIN_ICONS = "";
+	});
+
 	it("scout", () => expect(casteIcon("scout")).toBe("🔍"));
 	it("soldier", () => expect(casteIcon("soldier")).toBe("🛡️"));
 	it("drone", () => expect(casteIcon("drone")).toBe("⚙️"));
 	it("worker", () => expect(casteIcon("worker")).toBe("⚒️"));
 	it("unknown", () => expect(casteIcon("xyz")).toBe("⚒️"));
+
+	it("plain mode: scout", () => {
+		process.env.OH_PI_PLAIN_ICONS = "1";
+		expect(casteIcon("scout")).toBe("[?]");
+	});
+	it("plain mode: worker", () => {
+		process.env.OH_PI_PLAIN_ICONS = "1";
+		expect(casteIcon("worker")).toBe("[w]");
+	});
+});
+
+describe("antIcon", () => {
+	afterEach(() => {
+		process.env.OH_PI_PLAIN_ICONS = "";
+	});
+
+	it("emoji mode", () => expect(antIcon()).toBe("🐜"));
+	it("plain mode", () => {
+		process.env.OH_PI_PLAIN_ICONS = "1";
+		expect(antIcon()).toBe("[ant]");
+	});
+});
+
+describe("checkMark / crossMark", () => {
+	afterEach(() => {
+		process.env.OH_PI_PLAIN_ICONS = "";
+	});
+
+	it("emoji mode", () => {
+		expect(checkMark()).toBe("✓");
+		expect(crossMark()).toBe("✗");
+	});
+	it("plain mode", () => {
+		process.env.OH_PI_PLAIN_ICONS = "1";
+		expect(checkMark()).toBe("[ok]");
+		expect(crossMark()).toBe("[x]");
+	});
+});
+
+describe("boltIcon", () => {
+	afterEach(() => {
+		process.env.OH_PI_PLAIN_ICONS = "";
+	});
+
+	it("emoji mode", () => expect(boltIcon()).toBe("⚡"));
+	it("plain mode", () => {
+		process.env.OH_PI_PLAIN_ICONS = "1";
+		expect(boltIcon()).toBe("!");
+	});
 });
 
 describe("buildReport", () => {
+	afterEach(() => {
+		process.env.OH_PI_PLAIN_ICONS = "";
+	});
+
 	it("builds report with goal, status, cost, tasks", () => {
 		const state: ColonyState = {
 			id: "c-1",
@@ -136,5 +214,55 @@ describe("buildReport", () => {
 		expect(report).toContain("Task A");
 		expect(report).toContain("Task B");
 		expect(report).toContain("some error");
+	});
+
+	it("builds plain report when OH_PI_PLAIN_ICONS is set", () => {
+		process.env.OH_PI_PLAIN_ICONS = "1";
+		const state: ColonyState = {
+			id: "c-2",
+			goal: "Plain test",
+			status: "done",
+			tasks: [
+				{
+					id: "t1",
+					parentId: null,
+					title: "Task A",
+					description: "",
+					caste: "worker",
+					status: "done",
+					priority: 3,
+					files: [],
+					claimedBy: null,
+					result: null,
+					error: null,
+					spawnedTasks: [],
+					createdAt: 0,
+					startedAt: 0,
+					finishedAt: 1000,
+				},
+			],
+			ants: [],
+			pheromones: [],
+			concurrency: { current: 1, min: 1, max: 4, optimal: 1, history: [] },
+			metrics: {
+				tasksTotal: 1,
+				tasksDone: 1,
+				tasksFailed: 0,
+				antsSpawned: 1,
+				totalCost: 0.01,
+				totalTokens: 500,
+				startTime: 0,
+				throughputHistory: [],
+			},
+			maxCost: null,
+			modelOverrides: {},
+			createdAt: 0,
+			finishedAt: 5000,
+		};
+		const report = buildReport(state);
+		expect(report).toContain("[ant]");
+		expect(report).toContain("[ok]");
+		expect(report).not.toContain("🐜");
+		expect(report).not.toContain("✅");
 	});
 });

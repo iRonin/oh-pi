@@ -35,7 +35,7 @@ export default function (pi: ExtensionAPI) {
 			const cmd = (event.input as { command?: string }).command ?? "";
 			const match = DANGEROUS_PATTERNS.find((p) => p.test(cmd));
 			if (match && ctx.hasUI) {
-				const ok = await ctx.ui.confirm("⚠️ Dangerous Command", `Execute: ${cmd}?`);
+				const ok = await ctx.ui.confirm("Dangerous Command", `Execute: ${cmd}?`);
 				if (!ok) {
 					return { block: true, reason: "Blocked by user" };
 				}
@@ -48,7 +48,7 @@ export default function (pi: ExtensionAPI) {
 			const hit = PROTECTED_PATHS.find((p) => filePath.includes(p));
 			if (hit) {
 				if (ctx.hasUI) {
-					const ok = await ctx.ui.confirm("🛡️ Protected Path", `Allow write to ${filePath}?`);
+					const ok = await ctx.ui.confirm("Protected Path", `Allow write to ${filePath}?`);
 					if (!ok) {
 						return { block: true, reason: `Protected path: ${hit}` };
 					}

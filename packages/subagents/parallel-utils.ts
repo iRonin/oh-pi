@@ -84,9 +84,9 @@ export function aggregateParallelOutputs(
 				r.exitCode === -1
 					? "⏭️ SKIPPED"
 					: r.exitCode !== 0
-						? `⚠️ FAILED (exit code ${r.exitCode})${r.error ? `: ${r.error}` : ""}`
+						? `[!] FAILED (exit code ${r.exitCode})${r.error ? `: ${r.error}` : ""}`
 						: !hasOutput
-							? "⚠️ EMPTY OUTPUT"
+							? "[!] EMPTY OUTPUT"
 							: "";
 			const body = status ? (hasOutput ? `${status}\n${r.output}` : status) : r.output;
 			return `${header}\n${body}`;

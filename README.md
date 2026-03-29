@@ -75,6 +75,52 @@ npx @ifi/oh-pi --remove             # uninstall all oh-pi packages from pi
 
 ---
 
+## Configuration
+
+### Plain Icons (disable emoji)
+
+If emoji icons render poorly in your terminal (wrong font, garbled glyphs, misaligned widths), you
+can switch to ASCII-safe fallbacks. All emoji like 🐜 ✅ ❌ 🚀 become plain text like `[ant]`
+`[ok]` `[ERR]` `[>>]`.
+
+Three ways to enable (in priority order):
+
+**1. Environment variable** (highest priority)
+
+```bash
+export OH_PI_PLAIN_ICONS=1    # add to ~/.bashrc or ~/.zshrc
+```
+
+**2. CLI flag** (per session)
+
+```bash
+pi --plain-icons
+```
+
+**3. settings.json** (persistent, recommended)
+
+Add `"plainIcons": true` to your global or project-local settings:
+
+```bash
+# Global — applies to all projects
+echo '  "plainIcons": true' >> ~/.pi/agent/settings.json
+
+# Or project-local — applies only to this repo
+echo '  "plainIcons": true' >> .pi/settings.json
+```
+
+```jsonc
+// ~/.pi/agent/settings.json
+{
+  "defaultProvider": "anthropic",
+  "defaultModel": "claude-sonnet-4",
+  "plainIcons": true
+  // ...
+}
+```
+
+---
+
 ## Extensions
 
 ### 🛡️ Safe Guard (`safe-guard`) — **default: off (opt-in)**

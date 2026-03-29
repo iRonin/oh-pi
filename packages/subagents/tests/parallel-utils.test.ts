@@ -189,17 +189,17 @@ describe("aggregateParallelOutputs", () => {
 
 	it("marks failed tasks", () => {
 		const result = aggregateParallelOutputs([{ agent: "agent-a", output: "partial output", exitCode: 1 }]);
-		expect(result).toContain("⚠️ FAILED (exit code 1)");
+		expect(result).toContain("[!] FAILED (exit code 1)");
 	});
 
 	it("marks empty output", () => {
 		const result = aggregateParallelOutputs([{ agent: "agent-a", output: "", exitCode: 0 }]);
-		expect(result).toContain("⚠️ EMPTY OUTPUT");
+		expect(result).toContain("[!] EMPTY OUTPUT");
 	});
 
 	it("treats whitespace-only output as empty", () => {
 		const result = aggregateParallelOutputs([{ agent: "agent-a", output: "   \n  ", exitCode: 0 }]);
-		expect(result).toContain("⚠️ EMPTY OUTPUT");
+		expect(result).toContain("[!] EMPTY OUTPUT");
 	});
 
 	it("marks skipped tasks distinctly from failures", () => {

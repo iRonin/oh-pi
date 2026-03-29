@@ -37,7 +37,7 @@ export default function (pi: ExtensionAPI) {
 			const { stdout } = await pi.exec("git", ["status", "--porcelain"]);
 			if (stdout.trim() && ctx.hasUI) {
 				const lines = stdout.trim().split("\n").length;
-				ctx.ui.notify(`⚠️ Dirty repo: ${lines} uncommitted change(s)`, "warning");
+				ctx.ui.notify(`Dirty repo: ${lines} uncommitted change(s)`, "warning");
 			}
 		} catch {
 			// Not a git repo — nothing to warn about

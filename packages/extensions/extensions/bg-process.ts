@@ -143,7 +143,7 @@ export default function (pi: ExtensionAPI) {
 					});
 
 					const preview = (stdout + stderr).slice(0, 500);
-					const text = `Command still running after ${effectiveTimeout / 1000}s, moved to background.\nPID: ${childPid}\nLog: ${logFile}\nStop: kill ${childPid}\n\nOutput so far:\n${preview}\n\n⏳ You will be notified automatically when it finishes. No need to poll.`;
+					const text = `Command still running after ${effectiveTimeout / 1000}s, moved to background.\nPID: ${childPid}\nLog: ${logFile}\nStop: kill ${childPid}\n\nOutput so far:\n${preview}\n\nYou will be notified automatically when it finishes. No need to poll.`;
 
 					resolve({ content: [{ type: "text", text }], details: {} });
 				}, effectiveTimeout);
@@ -216,7 +216,7 @@ export default function (pi: ExtensionAPI) {
 					const status = p.finished
 						? `⚪ stopped (exit ${p.exitCode ?? "?"})`
 						: isAlive(p.pid)
-							? "🟢 running"
+							? "running"
 							: "⚪ stopped";
 					return `PID: ${p.pid} | ${status} | Log: ${p.logFile}\n  Cmd: ${p.command}`;
 				});

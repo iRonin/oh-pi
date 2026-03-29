@@ -1,11 +1,50 @@
 /**
  * oh-pi Compact Header — table-style startup info with dynamic column widths
+ *
+ * Also bootstraps the plain-icons setting: reads `plainIcons` from
+ * settings.json and/or the `--plain-icons` CLI flag, and bridges it
+ * to the `OH_PI_PLAIN_ICONS` env var so all oh-pi packages pick it up.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { VERSION } from "@mariozechner/pi-coding-agent";
+import { getAgentDir, VERSION } from "@mariozechner/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 
+/** Read `plainIcons` from settings.json (global or project-local). */
+function loadPlainIconsSetting(): boolean {
+	for (const dir of [join(process.cwd(), ".pi"), getAgentDir()]) {
+		try {
+			const raw = readFileSync(join(dir, "settings.json"), "utf8");
+			const settings = JSON.parse(raw);
+			if (settings.plainIcons === true) {
+				return true;
+			}
+		} catch {
+			/* file missing or unparseable — skip */
+		}
+	}
+	return false;
+}
+
 export default function (pi: ExtensionAPI) {
+	// Register --plain-icons CLI flag
+	pi.registerFlag("plain-icons", {
+		description: "Use ASCII-safe icons instead of emoji (same as OH_PI_PLAIN_ICONS=1 or plainIcons in settings.json)",
+		type: "boolean",
+		default: false,
+	});
+
+	// Bridge settings.json and --plain-icons flag to the env var
+	// (env var takes precedence, then flag, then settings.json)
+	if (!process.env.OH_PI_PLAIN_ICONS) {
+		const fromFlag = pi.getFlag("plain-icons");
+		if (fromFlag === true) {
+			process.env.OH_PI_PLAIN_ICONS = "1";
+		} else if (loadPlainIconsSetting()) {
+			process.env.OH_PI_PLAIN_ICONS = "1";
+		}
+	}
 	pi.on("session_start", async (_event, ctx) => {
 		if (!ctx.hasUI) {
 			return;

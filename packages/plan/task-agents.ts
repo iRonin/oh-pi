@@ -449,11 +449,11 @@ function isTaskAgentRunDetails(details: unknown): details is TaskAgentRunDetails
 function statusIcon(status: TaskAgentTaskProgress["status"]): string {
 	switch (status) {
 		case "completed":
-			return "✓";
+			return "+";
 		case "failed":
-			return "✗";
+			return "x";
 		case "running":
-			return "⏳";
+			return "..";
 		default:
 			return "○";
 	}
@@ -529,7 +529,7 @@ export function registerTaskAgentTools(
 			];
 			const visibleTasks = expanded ? details.tasks : details.tasks.slice(0, TASK_AGENT_PREVIEW_LIMIT);
 			for (const task of visibleTasks) {
-				const icon = task.exitCode === 0 ? theme.fg("success", "✓") : theme.fg("error", "✗");
+				const icon = task.exitCode === 0 ? theme.fg("success", "+") : theme.fg("error", "x");
 				if (!expanded) {
 					lines.push(`${icon} ${theme.fg("accent", task.taskId)} ${theme.fg("muted", summarizeSnippet(task.task, 80))}`);
 					continue;

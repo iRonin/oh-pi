@@ -1,3 +1,4 @@
+import { icon } from "./icons.js";
 import type { ModelCapabilities } from "./types.js";
 
 /** Model capability lookup table — maps model IDs to their context window, output limits, and features. */
@@ -58,41 +59,83 @@ export const THEMES = [
 	{ name: "light", label: "Pi Default Light", style: "light" },
 ];
 
-/** Available extensions — each has a name, label, and whether it's enabled by default. */
+/** Available extensions — each has a name, label function, and whether it's enabled by default. */
 export const EXTENSIONS = [
-	{ name: "safe-guard", label: "🛡️  Safe Guard — Dangerous command confirm + path protection", default: false },
-	{ name: "git-guard", label: "📦 Git Guard — Auto stash checkpoint + dirty repo warning + notify", default: true },
-	{ name: "auto-session-name", label: "📝 Auto Session Name — Name sessions from first message", default: true },
 	{
-		name: "custom-footer",
-		label: "📊 Custom Footer — Enhanced status bar with tokens, cost, time, git, cwd",
+		name: "safe-guard",
+		get label() {
+			return `${icon("shield")}  Safe Guard — Dangerous command confirm + path protection`;
+		},
+		default: false,
+	},
+	{
+		name: "git-guard",
+		get label() {
+			return `${icon("package")} Git Guard — Auto stash checkpoint + dirty repo warning + notify`;
+		},
 		default: true,
 	},
-	{ name: "compact-header", label: "⚡ Compact Header — Dense startup info replacing verbose output", default: true },
+	{
+		name: "auto-session-name",
+		get label() {
+			return `${icon("memo")} Auto Session Name — Name sessions from first message`;
+		},
+		default: true,
+	},
+	{
+		name: "custom-footer",
+		get label() {
+			return `${icon("chart")} Custom Footer — Enhanced status bar with tokens, cost, time, git, cwd`;
+		},
+		default: true,
+	},
+	{
+		name: "compact-header",
+		get label() {
+			return `${icon("bolt")} Compact Header — Dense startup info replacing verbose output`;
+		},
+		default: true,
+	},
 	{
 		name: "ant-colony",
-		label: "🐜 Ant Colony — Autonomous multi-agent swarm with adaptive concurrency",
+		get label() {
+			return `${icon("ant")} Ant Colony — Autonomous multi-agent swarm with adaptive concurrency`;
+		},
 		default: false,
 	},
 	{
 		name: "plan",
-		label: "🗺️ Plan Mode — Branch-aware planning and delegated research via /plan",
+		get label() {
+			return `${icon("map")} Plan Mode — Branch-aware planning and delegated research via /plan`;
+		},
 		default: false,
 	},
 	{
 		name: "spec",
-		label: "📐 Spec Workflow — Native spec-driven planning and implementation via /spec",
+		get label() {
+			return `${icon("spec")} Spec Workflow — Native spec-driven planning and implementation via /spec`;
+		},
 		default: false,
 	},
-	{ name: "auto-update", label: "🔄 Auto Update — Check for oh-pi updates on startup and notify", default: true },
+	{
+		name: "auto-update",
+		get label() {
+			return `${icon("update")} Auto Update — Check for oh-pi updates on startup and notify`;
+		},
+		default: true,
+	},
 	{
 		name: "bg-process",
-		label: "⏳ Bg Process — Auto-background long-running commands (dev servers, etc.)",
+		get label() {
+			return `${icon("clock")} Bg Process — Auto-background long-running commands (dev servers, etc.)`;
+		},
 		default: false,
 	},
 	{
 		name: "usage-tracker",
-		label: "💰 Usage Tracker — Real-time per-model token & cost monitoring with /usage command",
+		get label() {
+			return `${icon("cost")} Usage Tracker — Real-time per-model token & cost monitoring with /usage command`;
+		},
 		default: false,
 	},
 ];

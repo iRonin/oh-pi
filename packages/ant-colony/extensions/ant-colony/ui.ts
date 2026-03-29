@@ -8,8 +8,16 @@
  * and the `COLONY_SIGNAL:*` protocol identifiers (e.g. `planning_recovery`,
  * `budget_exceeded`, `task_done`). These are wire-format constants, not
  * arbitrary variable names.
+ *
+ * Icon mode is controlled by the `OH_PI_PLAIN_ICONS` environment variable.
+ * When set to `"1"` or `"true"`, all icons fall back to ASCII-safe glyphs.
  */
 import type { ColonyState } from "./types.js";
+
+/** Check whether plain (ASCII-safe) icon mode is active. */
+function isPlain(): boolean {
+	return process.env.OH_PI_PLAIN_ICONS === "1" || process.env.OH_PI_PLAIN_ICONS === "true";
+}
 
 /**
  * Format a millisecond duration into a human-readable string like `42s` or `3m12s`.
@@ -41,7 +49,7 @@ export function formatTokens(n: number): string {
 	return n < 1000000 ? `${(n / 1000).toFixed(1)}k` : `${(n / 1000000).toFixed(1)}M`;
 }
 
-const STATUS_ICONS: Record<string, string> = {
+const EMOJI_STATUS_ICONS: Record<string, string> = {
 	launched: "🚀",
 	scouting: "🔍",
 	// biome-ignore lint/style/useNamingConvention: Wire-format protocol key
@@ -55,6 +63,22 @@ const STATUS_ICONS: Record<string, string> = {
 	failed: "❌",
 	// biome-ignore lint/style/useNamingConvention: Wire-format protocol key
 	budget_exceeded: "💰",
+};
+
+const PLAIN_STATUS_ICONS: Record<string, string> = {
+	launched: "[>>]",
+	scouting: "[?]",
+	// biome-ignore lint/style/useNamingConvention: Wire-format protocol key
+	planning_recovery: "[~]",
+	working: "[w]",
+	reviewing: "[!]",
+	// biome-ignore lint/style/useNamingConvention: Wire-format protocol key
+	task_done: "[ok]",
+	done: "[ok]",
+	complete: "[ok]",
+	failed: "[ERR]",
+	// biome-ignore lint/style/useNamingConvention: Wire-format protocol key
+	budget_exceeded: "[$]",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -73,12 +97,26 @@ const STATUS_LABELS: Record<string, string> = {
 	budget_exceeded: "BUDGET_EXCEEDED",
 };
 
+const EMOJI_CASTE_ICONS: Record<string, string> = {
+	scout: "🔍",
+	soldier: "🛡️",
+	drone: "⚙️",
+};
+
+const PLAIN_CASTE_ICONS: Record<string, string> = {
+	scout: "[?]",
+	soldier: "[!]",
+	drone: "[d]",
+};
+
 /**
- * Get the emoji icon for a colony status/phase string.
- * Falls back to 🐜 for unknown statuses.
+ * Get the icon for a colony status/phase string.
+ * Falls back to 🐜 / `[ant]` for unknown statuses.
  */
 export function statusIcon(status: string): string {
-	return STATUS_ICONS[status] || "🐜";
+	const map = isPlain() ? PLAIN_STATUS_ICONS : EMOJI_STATUS_ICONS;
+	const fallback = isPlain() ? "[ant]" : "🐜";
+	return map[status] || fallback;
 }
 
 /**
@@ -102,19 +140,32 @@ export function progressBar(progress: number, width = 14): string {
 }
 
 /**
- * Get the emoji icon for an ant caste (scout, worker, soldier, drone).
+ * Get the icon for an ant caste (scout, worker, soldier, drone).
  */
 export function casteIcon(caste: string): string {
-	if (caste === "scout") {
-		return "🔍";
-	}
-	if (caste === "soldier") {
-		return "🛡️";
-	}
-	if (caste === "drone") {
-		return "⚙️";
-	}
-	return "⚒️";
+	const map = isPlain() ? PLAIN_CASTE_ICONS : EMOJI_CASTE_ICONS;
+	const fallback = isPlain() ? "[w]" : "⚒️";
+	return map[caste] || fallback;
+}
+
+/** Ant icon — 🐜 or `[ant]` depending on icon mode. */
+export function antIcon(): string {
+	return isPlain() ? "[ant]" : "🐜";
+}
+
+/** Check mark — ✓ or `[ok]`. */
+export function checkMark(): string {
+	return isPlain() ? "[ok]" : "✓";
+}
+
+/** Cross mark — ✗ or `[x]`. */
+export function crossMark(): string {
+	return isPlain() ? "[x]" : "✗";
+}
+
+/** Lightning bolt — ⚡ or `!`. */
+export function boltIcon(): string {
+	return isPlain() ? "!" : "⚡";
 }
 
 /**
@@ -125,15 +176,15 @@ export function buildReport(state: ColonyState): string {
 	const m = state.metrics;
 	const elapsed = state.finishedAt ? formatDuration(state.finishedAt - state.createdAt) : "?";
 	return [
-		"## 🐜 Ant Colony Report",
+		`## ${antIcon()} Ant Colony Report`,
 		`**Goal:** ${state.goal}`,
 		`**Status:** ${statusIcon(state.status)} ${state.status} │ ${formatCost(m.totalCost)}`,
 		`**Duration:** ${elapsed}`,
 		`**Tasks:** ${m.tasksDone}/${m.tasksTotal} done${m.tasksFailed > 0 ? `, ${m.tasksFailed} failed` : ""}`,
 		"",
-		...state.tasks.filter((t) => t.status === "done").map((t) => `- ✓ **${t.title}**`),
+		...state.tasks.filter((t) => t.status === "done").map((t) => `- ${checkMark()} **${t.title}**`),
 		...state.tasks
 			.filter((t) => t.status === "failed")
-			.map((t) => `- ✗ **${t.title}** — ${t.error?.slice(0, 80) || "unknown"}`),
+			.map((t) => `- ${crossMark()} **${t.title}** — ${t.error?.slice(0, 80) || "unknown"}`),
 	].join("\n");
 }

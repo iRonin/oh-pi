@@ -537,7 +537,7 @@ export async function executeChain(params: ChainExecutionParams): Promise<ChainE
 								? `Agent wrote to different file(s): ${mdFiles.join(", ")} instead of ${behavior.output}`
 								: `Agent did not create expected output file: ${behavior.output}`;
 						// Add warning to result but don't fail
-						r.error = r.error ? `${r.error}\n⚠️ ${warning}` : `⚠️ ${warning}`;
+						r.error = r.error ? `${r.error}\n[!] ${warning}` : `[!] ${warning}`;
 					}
 				} catch {
 					// Ignore validation errors - this is just a diagnostic

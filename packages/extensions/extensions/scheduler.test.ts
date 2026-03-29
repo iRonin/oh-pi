@@ -1092,7 +1092,7 @@ describe("SchedulerRuntime", () => {
 			runtime.setRuntimeContext(ctx as any);
 			runtime.addRecurringIntervalTask("check", 5 * ONE_MINUTE);
 			runtime.updateStatus();
-			expect(ctx._statusMap.get("pi-scheduler")).toContain("⏰ 1 active");
+			expect(ctx._statusMap.get("pi-scheduler")).toContain("1 active");
 		});
 
 		it("shows paused message when all tasks disabled", () => {
@@ -1101,7 +1101,7 @@ describe("SchedulerRuntime", () => {
 			const task = runtime.addRecurringIntervalTask("check", 5 * ONE_MINUTE);
 			runtime.setTaskEnabled(task.id, false);
 			runtime.updateStatus();
-			expect(ctx._statusMap.get("pi-scheduler")).toContain("⏸");
+			expect(ctx._statusMap.get("pi-scheduler")).toContain("paused");
 		});
 
 		it("does not update without UI", () => {

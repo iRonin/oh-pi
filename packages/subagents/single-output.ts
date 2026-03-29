@@ -49,7 +49,7 @@ export function finalizeSingleOutput(params: {
 			return { displayOutput, savedPath: save.savedPath };
 		}
 		if (save.error) {
-			displayOutput += `\n\n⚠️ Failed to save output to: ${params.outputPath}\n${save.error}`;
+			displayOutput += `\n\n[!] Failed to save output to: ${params.outputPath}\n${save.error}`;
 			return { displayOutput, saveError: save.error };
 		}
 	}

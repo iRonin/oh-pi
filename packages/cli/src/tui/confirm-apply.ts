@@ -126,7 +126,7 @@ export async function confirmApply(config: OhPConfig, env: EnvInfo) {
 	// ═══ Result ═══
 	const tree = [
 		`${chalk.gray("~/.pi/agent/")}`,
-		`${chalk.gray("├── ")}auth.json ${chalk.dim("🔒")}`,
+		`${chalk.gray("├── ")}auth.json ${chalk.dim("")}`,
 		`${chalk.gray("├── ")}settings.json`,
 		...(config.keybindings !== "default" ? [`${chalk.gray("├── ")}keybindings.json`] : []),
 		`${chalk.gray("├── ")}AGENTS.md ${chalk.dim(config.agents)}`,

@@ -1047,7 +1047,7 @@ export class ChainClarifyComponent implements Component {
 				const prefix = isSelected ? th.fg("accent", "→ ") : "  ";
 				const modelText = isSelected ? th.fg("accent", model.id) : model.id;
 				const providerBadge = th.fg("dim", ` [${model.provider}]`);
-				const currentBadge = isCurrent ? th.fg("success", " ✓") : "";
+				const currentBadge = isCurrent ? th.fg("success", " +") : "";
 
 				lines.push(this.row(` ${prefix}${modelText}${providerBadge}${currentBadge}`));
 			}
@@ -1358,7 +1358,7 @@ export class ChainClarifyComponent implements Component {
 
 		// Chain-wide progress setting
 		const progressEnabled = this.agentConfigs.some((_, i) => this.getEffectiveBehavior(i).progress);
-		const progressValue = progressEnabled ? th.fg("success", "✓ enabled") : th.fg("dim", "✗ disabled");
+		const progressValue = progressEnabled ? th.fg("success", "+ enabled") : th.fg("dim", "- disabled");
 		lines.push(this.row(` Progress: ${progressValue} ${th.fg("dim", "(press [p] to toggle)")}`));
 		lines.push(this.row(""));
 

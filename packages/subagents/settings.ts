@@ -353,13 +353,13 @@ export function aggregateParallelOutputs(results: ParallelTaskResult[]): string 
 				r.exitCode === -1
 					? "⏭️ SKIPPED"
 					: r.exitCode !== 0
-						? `⚠️ FAILED (exit code ${r.exitCode})${r.error ? `: ${r.error}` : ""}`
+						? `[!] FAILED (exit code ${r.exitCode})${r.error ? `: ${r.error}` : ""}`
 						: r.error
-							? `⚠️ WARNING: ${r.error}`
+							? `[!] WARNING: ${r.error}`
 							: !hasTextOutput && r.outputTargetPath && r.outputTargetExists === false
-								? `⚠️ EMPTY OUTPUT (expected output file missing: ${r.outputTargetPath})`
+								? `[!] EMPTY OUTPUT (expected output file missing: ${r.outputTargetPath})`
 								: !hasTextOutput && !r.outputTargetPath
-									? "⚠️ EMPTY OUTPUT (no textual response returned)"
+									? "[!] EMPTY OUTPUT (no textual response returned)"
 									: "";
 			const body = status ? (hasTextOutput ? `${status}\n${r.output}` : status) : r.output;
 			return `${header}\n${body}`;

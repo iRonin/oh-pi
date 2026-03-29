@@ -1505,7 +1505,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 		for (let i = COST_THRESHOLDS.length - 1; i >= 0; i--) {
 			if (cost >= COST_THRESHOLDS[i] && i > lastThresholdIndex) {
 				lastThresholdIndex = i;
-				ctx.ui.notify(`💰 Session cost reached ${fmtCost(COST_THRESHOLDS[i])} (now ${fmtCost(cost)})`, "warning");
+				ctx.ui.notify(`Session cost reached ${fmtCost(COST_THRESHOLDS[i])} (now ${fmtCost(cost)})`, "warning");
 				return;
 			}
 		}
@@ -1784,7 +1784,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 			const windows = [...rl.windows].sort((a, b) => a.percentLeft - b.percentLeft);
 			lines.push(`  ${theme.fg("accent", `▸ ${name} Rate Limits`)}`);
 			if (rl.error) {
-				lines.push(`    ${theme.fg("error", "⚠ Error:")} ${theme.fg("dim", rl.error)}`);
+				lines.push(`    ${theme.fg("error", "Error:")} ${theme.fg("dim", rl.error)}`);
 			}
 
 			for (const w of windows) {
@@ -2076,7 +2076,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 
 		// Session + rolling 30d cost (only if we have data)
 		if (totals.turns > 0) {
-			parts.push(theme.fg("warning", `💰${fmtCost(totals.cost)}`));
+			parts.push(theme.fg("warning", `$${fmtCost(totals.cost)}`));
 			parts.push(theme.fg("dim", `30d: ${fmtCost(totals.rolling30dCost)}`));
 			parts.push(`${theme.fg("success", fmtTokens(totals.input))}/${theme.fg("warning", fmtTokens(totals.output))}`);
 		}
@@ -2084,7 +2084,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 		const externalSources = getExternalSources();
 		if (externalSources.length > 0) {
 			const externalCost = externalSources.reduce((sum, source) => sum + source.costTotal, 0);
-			parts.push(theme.fg("warning", `🐜${fmtCost(externalCost)}`));
+			parts.push(theme.fg("warning", `$${fmtCost(externalCost)}`));
 		}
 
 		if (parts.length === 0) {

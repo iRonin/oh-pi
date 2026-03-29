@@ -26,7 +26,7 @@ interface WizardState {
 }
 
 function sectionLabel(label: string, done: boolean): string {
-	return done ? `${label} ${chalk.green("✓")}` : `${label} ${chalk.yellow("•")}`;
+	return done ? `${label} ${chalk.green("+")}` : `${label} ${chalk.yellow("•")}`;
 }
 
 function summarizeAppearance(theme: string, keybindings: string): string {

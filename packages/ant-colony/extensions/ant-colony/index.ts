@@ -1,5 +1,5 @@
 /**
- * 🐜 Ant Colony Extension — pi extension entry point.
+ * Ant Colony Extension — pi extension entry point.
  *
  * Background non-blocking colony:
  * - Colony runs in the background without blocking the main conversation
@@ -26,8 +26,12 @@ import type {
 	ColonyWorkspace,
 } from "./types.js";
 import {
+	antIcon,
+	boltIcon,
 	buildReport,
 	casteIcon,
+	checkMark,
+	crossMark,
 	formatCost,
 	formatDuration,
 	formatTokens,
@@ -281,10 +285,10 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 				const pct = `${Math.round(progress * 100)}%`;
 				const active = colony.antStreams.size;
 
-				const parts = [`🐜[${colonyIdentity(colony)}] ${statusIcon(phase)} ${statusLabel(phase)}`];
+				const parts = [`${antIcon()}[${colonyIdentity(colony)}] ${statusIcon(phase)} ${statusLabel(phase)}`];
 				parts.push(m ? `${m.tasksDone}/${m.tasksTotal} (${pct})` : `0/0 (${pct})`);
-				parts.push(`⚡${active}`);
-				parts.push(colony.workspace.mode === "worktree" ? "🧪wt" : "🧪shared");
+				parts.push(`${boltIcon()}${active}`);
+				parts.push(colony.workspace.mode === "worktree" ? "wt" : "shared");
 				if (m) {
 					parts.push(formatCost(m.totalCost));
 				}
@@ -452,7 +456,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 					pi.sendMessage(
 						{
 							customType: "ant-colony-progress",
-							content: `[COLONY_SIGNAL:${signal.phase.toUpperCase()}] 🐜[${colonyIdentity(colony)}] ${signal.message} (${pct}%, ${formatCost(signal.cost)})`,
+							content: `[COLONY_SIGNAL:${signal.phase.toUpperCase()}] ${antIcon()}[${colonyIdentity(colony)}] ${signal.message} (${pct}%, ${formatCost(signal.cost)})`,
 							display: true,
 						},
 						{ triggerTurn: false, deliverAs: "followUp" },
@@ -481,7 +485,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 				colony.antStreams.delete(ant.id);
 				// Inject a one-liner to main process on each task completion
 				const m = colony.state?.metrics;
-				const icon = ant.status === "done" ? "✓" : "✗";
+				const icon = ant.status === "done" ? checkMark() : crossMark();
 				const progress = m ? `${m.tasksDone}/${m.tasksTotal}` : "";
 				const cost = m ? formatCost(m.totalCost) : "";
 				pushLog(colony, {
@@ -491,7 +495,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 				pi.sendMessage(
 					{
 						customType: "ant-colony-progress",
-						content: `[COLONY_SIGNAL:TASK_DONE] 🐜[${colonyIdentity(colony)}] ${icon} ${task.title.slice(0, 60)} (${progress}, ${cost})`,
+						content: `[COLONY_SIGNAL:TASK_DONE] ${antIcon()}[${colonyIdentity(colony)}] ${icon} ${task.title.slice(0, 60)} (${progress}, ${cost})`,
 						display: true,
 					},
 					{ triggerTurn: false, deliverAs: "followUp" },
@@ -604,7 +608,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 				);
 
 				pi.events.emit("ant-colony:notify", {
-					msg: `🐜[${colonyIdentityVerbose(colony)}] Colony ${ok ? "completed" : phase.replace(/_/g, " ")}: ${m.tasksDone}/${m.tasksTotal} tasks │ ${formatCost(m.totalCost)} │ ${formatWorkspaceSummary(workspace)}`,
+					msg: `${antIcon()}[${colonyIdentityVerbose(colony)}] Colony ${ok ? "completed" : phase.replace(/_/g, " ")}: ${m.tasksDone}/${m.tasksTotal} tasks │ ${formatCost(m.totalCost)} │ ${formatWorkspaceSummary(workspace)}`,
 					level: ok ? "success" : "error",
 				});
 			})
@@ -616,10 +620,10 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 					pi.events.emit("ant-colony:clear-ui");
 				}
 				pi.events.emit("ant-colony:notify", {
-					msg: `🐜[${colonyIdentityVerbose(colony)}] Colony crashed: ${e} │ ${formatWorkspaceSummary(workspace)}`,
+					msg: `${antIcon()}[${colonyIdentityVerbose(colony)}] Colony crashed: ${e} │ ${formatWorkspaceSummary(workspace)}`,
 					level: "error",
 				});
-				const crashReport = withWorkspaceReport(workspace, `## 🐜 Colony Crashed\n${e}`);
+				const crashReport = withWorkspaceReport(workspace, `## ${antIcon()} Colony Crashed\n${e}`);
 				pi.sendMessage(
 					{
 						customType: "ant-colony-report",
@@ -665,13 +669,13 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 		// Extract key info for rendering
 		const _statusMatch = content.match(/\*\*Status:\*\* (.+)/);
 		const durationMatch = content.match(/\*\*Duration:\*\* (.+)/);
-		const ok = content.includes("✅ done");
+		const ok = content.includes("done") && (content.includes("✅") || content.includes("[ok]"));
 
 		container.addChild(
 			new Text(
-				(ok ? theme.fg("success", "✓") : theme.fg("error", "✗")) +
+				(ok ? theme.fg("success", checkMark()) : theme.fg("error", crossMark())) +
 					" " +
-					theme.fg("toolTitle", theme.bold("🐜 Ant Colony Report")) +
+					theme.fg("toolTitle", theme.bold(`${antIcon()} Ant Colony Report`)) +
 					(durationMatch ? theme.fg("muted", ` │ ${durationMatch[1]}`) : ""),
 				0,
 				0,
@@ -679,9 +683,11 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 		);
 
 		// Render task results
-		const taskLines = content.split("\n").filter((l) => l.startsWith("- ✓") || l.startsWith("- ✗"));
+		const ck = checkMark();
+		const cx = crossMark();
+		const taskLines = content.split("\n").filter((l) => l.startsWith(`- ${ck}`) || l.startsWith(`- ${cx}`));
 		for (const l of taskLines.slice(0, 8)) {
-			const icon = l.startsWith("- ✓") ? theme.fg("success", "✓") : theme.fg("error", "✗");
+			const icon = l.startsWith(`- ${ck}`) ? theme.fg("success", ck) : theme.fg("error", cx);
 			container.addChild(new Text(`  ${icon} ${theme.fg("muted", l.slice(4).trim().slice(0, 70))}`, 0, 0));
 		}
 		if (taskLines.length > 8) {
@@ -691,7 +697,9 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 		// Metrics line
 		const metricsLines = content
 			.split("\n")
-			.filter((l) => l.startsWith("- ") && !l.startsWith("- ✓") && !l.startsWith("- ✗") && !l.startsWith("- ["));
+			.filter(
+				(l) => l.startsWith("- ") && !l.startsWith(`- ${ck}`) && !l.startsWith(`- ${cx}`) && !l.startsWith("- ["),
+			);
 		if (metricsLines.length > 0) {
 			container.addChild(new Text(theme.fg("muted", `  ${metricsLines.map((l) => l.slice(2)).join(" │ ")}`), 0, 0));
 		}
@@ -760,7 +768,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 						}
 
 						lines.push(
-							theme.fg("accent", theme.bold(`  🐜 Colony [${colonyIdentity(c)}]`)) +
+							theme.fg("accent", theme.bold(`  ${antIcon()} Colony [${colonyIdentity(c)}]`)) +
 								theme.fg("muted", ` │ ${elapsed} │ ${cost}`),
 						);
 						lines.push(theme.fg("muted", `  Goal: ${trim(c.goal, w - 8)}`));
@@ -769,7 +777,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 							lines.push(theme.fg("muted", `  Stable ID: ${trim(c.identity.stableId, w - 14)}`));
 						}
 						lines.push(
-							`  ${statusIcon(phase)} ${theme.bold(statusLabel(phase))} │ ${m ? `${m.tasksDone}/${m.tasksTotal}` : "0/0"} │ ${pct}% │ ⚡${activeAnts}`,
+							`  ${statusIcon(phase)} ${theme.bold(statusLabel(phase))} │ ${m ? `${m.tasksDone}/${m.tasksTotal}` : "0/0"} │ ${pct}% │ ${boltIcon()}${activeAnts}`,
 						);
 						lines.push(theme.fg("muted", `  ${progressBar(progress, barWidth)} ${pct}%`));
 						if (c.phase && c.phase !== "initializing") {
@@ -834,12 +842,12 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 								for (const t of filtered.slice(0, 16)) {
 									const icon =
 										t.status === "done"
-											? theme.fg("success", "✓")
+											? theme.fg("success", checkMark())
 											: t.status === "failed"
-												? theme.fg("error", "✗")
+												? theme.fg("error", crossMark())
 												: t.status === "active"
-													? theme.fg("warning", "●")
-													: theme.fg("dim", "○");
+													? theme.fg("warning", "*")
+													: theme.fg("dim", ".");
 									const dur =
 										t.finishedAt && t.startedAt
 											? theme.fg("dim", ` ${formatDuration(t.finishedAt - t.startedAt)}`)
@@ -880,7 +888,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 							if (failedTasks.length > 0) {
 								lines.push(theme.fg("warning", `  Warnings (${failedTasks.length})`));
 								for (const t of failedTasks.slice(0, 4)) {
-									lines.push(`  ${theme.fg("error", "✗")} ${theme.fg("text", trim(t.title, w - 8))}`);
+									lines.push(`  ${theme.fg("error", crossMark())} ${theme.fg("text", trim(t.title, w - 8))}`);
 								}
 								if (failedTasks.length > 4) {
 									lines.push(theme.fg("muted", `  ⋯ +${failedTasks.length - 4} more failed tasks`));
@@ -898,10 +906,10 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 									const age = formatDuration(Math.max(0, now - log.timestamp));
 									const levelIcon =
 										log.level === "error"
-											? theme.fg("error", "✗")
+											? theme.fg("error", crossMark())
 											: log.level === "warning"
 												? theme.fg("warning", "!")
-												: theme.fg("muted", "•");
+												: theme.fg("muted", ".");
 									lines.push(`  ${levelIcon} ${theme.fg("muted", age)} ${theme.fg("text", trim(log.text, w - 12))}`);
 								}
 							}
@@ -1072,7 +1080,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 				content: [
 					{
 						type: "text",
-						text: `[COLONY_SIGNAL:LAUNCHED] [${launched.id}]\n🐜 Colony [${launched.id}] launched in background (${colonies.size} active).\nGoal: ${params.goal}\nWorkspace: ${formatWorkspaceSummary(launched.workspace)}\n\nThe colony runs autonomously in passive mode. Progress is pushed via [COLONY_SIGNAL:*] follow-up messages. Do not poll bg_colony_status unless the user explicitly asks for a manual snapshot.`,
+						text: `[COLONY_SIGNAL:LAUNCHED] [${launched.id}]\n${antIcon()} Colony [${launched.id}] launched in background (${colonies.size} active).\nGoal: ${params.goal}\nWorkspace: ${formatWorkspaceSummary(launched.workspace)}\n\nThe colony runs autonomously in passive mode. Progress is pushed via [COLONY_SIGNAL:*] follow-up messages. Do not poll bg_colony_status unless the user explicitly asks for a manual snapshot.`,
 					},
 				],
 			};
@@ -1080,7 +1088,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 
 		renderCall(args, theme) {
 			const goal = args.goal?.length > 70 ? `${args.goal.slice(0, 67)}...` : args.goal;
-			let text = theme.fg("toolTitle", theme.bold("🐜 ant_colony"));
+			let text = theme.fg("toolTitle", theme.bold(`${antIcon()} ant_colony`));
 			if (args.maxAnts) {
 				text += theme.fg("muted", ` ×${args.maxAnts}`);
 			}
@@ -1105,11 +1113,15 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 			}
 			const container = new Container();
 			container.addChild(
-				new Text(theme.fg("success", "✓ ") + theme.fg("toolTitle", theme.bold("Colony launched in background")), 0, 0),
+				new Text(
+					theme.fg("success", `${checkMark()} `) + theme.fg("toolTitle", theme.bold("Colony launched in background")),
+					0,
+					0,
+				),
 			);
 			if (colonies.size > 0) {
 				for (const colony of colonies.values()) {
-					const workspaceTag = colony.workspace.mode === "worktree" ? "🧪wt" : "🧪shared";
+					const workspaceTag = colony.workspace.mode === "worktree" ? "wt" : "shared";
 					container.addChild(
 						new Text(
 							theme.fg("muted", `  [${colonyIdentity(colony)}] ${workspaceTag} ${colony.goal.slice(0, 58)}`),
@@ -1143,10 +1155,10 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 		const activeAnts = c.antStreams.size;
 
 		const lines: string[] = [
-			`🐜 ${statusIcon(phase)} ${trim(c.goal, 80)}`,
+			`${antIcon()} ${statusIcon(phase)} ${trim(c.goal, 80)}`,
 			`ID: ${colonyIdentityVerbose(c)}`,
 			`Workspace: ${trim(formatWorkspaceSummary(c.workspace), 100)}`,
-			`${statusLabel(phase)} │ ${m ? `${m.tasksDone}/${m.tasksTotal} tasks` : "starting"} │ ${pct}% │ ⚡${activeAnts} │ ${m ? formatCost(m.totalCost) : "$0"} │ ${elapsed}`,
+			`${statusLabel(phase)} │ ${m ? `${m.tasksDone}/${m.tasksTotal} tasks` : "starting"} │ ${pct}% │ ${boltIcon()}${activeAnts} │ ${m ? formatCost(m.totalCost) : "$0"} │ ${elapsed}`,
 			`${progressBar(progress, 18)} ${pct}%`,
 		];
 
@@ -1161,7 +1173,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 			lines.push(`Last: ${trim(lastLog.text, 100)}`);
 		}
 		if (m && m.tasksFailed > 0) {
-			lines.push(`⚠ ${m.tasksFailed} failed`);
+			lines.push(`${m.tasksFailed} failed`);
 		}
 
 		return lines.join("\n");
@@ -1277,7 +1289,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 				modelRegistry: ctx.modelRegistry ?? undefined,
 			});
 			ctx.ui.notify(
-				`🐜[${launched.id}] Colony launched (${colonies.size} active): ${goal.slice(0, 70)}${goal.length > 70 ? "..." : ""}\nWorkspace: ${formatWorkspaceSummary(launched.workspace)}`,
+				`${antIcon()}[${launched.id}] Colony launched (${colonies.size} active): ${goal.slice(0, 70)}${goal.length > 70 ? "..." : ""}\nWorkspace: ${formatWorkspaceSummary(launched.workspace)}`,
 				"info",
 			);
 		},
@@ -1342,7 +1354,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 				for (const colony of colonies.values()) {
 					colony.abortController.abort();
 				}
-				ctx.ui.notify(`🐜 Abort signal sent to ${count} ${count === 1 ? "colony" : "colonies"}.`, "warning");
+				ctx.ui.notify(`${antIcon()} Abort signal sent to ${count} ${count === 1 ? "colony" : "colonies"}.`, "warning");
 			} else {
 				const colony = resolveColony(idArg);
 				if (!colony) {
@@ -1351,7 +1363,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 				}
 				colony.abortController.abort();
 				ctx.ui.notify(
-					`🐜[${colonyIdentityVerbose(colony)}] Abort signal sent. Waiting for ants to finish...`,
+					`${antIcon()}[${colonyIdentityVerbose(colony)}] Abort signal sent. Waiting for ants to finish...`,
 					"warning",
 				);
 			}
@@ -1390,7 +1402,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 					{ resume: true, stableIdHint: found.colonyId, workspaceHint: found.state.workspace ?? null },
 				);
 				ctx.ui.notify(
-					`🐜[${launched.id}|${found.colonyId}] Resuming: ${found.state.goal.slice(0, 60)}...\nWorkspace: ${formatWorkspaceSummary(launched.workspace)}`,
+					`${antIcon()}[${launched.id}|${found.colonyId}] Resuming: ${found.state.goal.slice(0, 60)}...\nWorkspace: ${formatWorkspaceSummary(launched.workspace)}`,
 					"info",
 				);
 			}

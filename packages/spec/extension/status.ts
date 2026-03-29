@@ -178,7 +178,7 @@ export function formatWorkflowStatus(status: WorkflowStatus): string {
 	];
 
 	for (const artifact of status.artifacts) {
-		lines.push(`- ${artifact.exists ? "✅" : "⬜"} ${artifact.label} — ${artifact.path}`);
+		lines.push(`- ${artifact.exists ? "[x]" : "[ ]"} ${artifact.label} — ${artifact.path}`);
 	}
 
 	lines.push("", "## Checklist status");
@@ -187,7 +187,7 @@ export function formatWorkflowStatus(status: WorkflowStatus): string {
 	} else {
 		for (const checklist of status.checklists) {
 			lines.push(
-				`- ${checklist.status === "pass" ? "✅" : "⚠️"} ${checklist.name}: ${checklist.completed}/${checklist.total} complete (${checklist.incomplete} incomplete)`,
+				`- ${checklist.status === "pass" ? "[ok]" : "[!]"} ${checklist.name}: ${checklist.completed}/${checklist.total} complete (${checklist.incomplete} incomplete)`,
 			);
 		}
 	}

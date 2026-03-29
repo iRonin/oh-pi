@@ -682,16 +682,13 @@ export class SchedulerRuntime {
 
 		const enabled = Array.from(this.tasks.values()).filter((t) => t.enabled);
 		if (enabled.length === 0) {
-			this.runtimeCtx.ui.setStatus(
-				"pi-scheduler",
-				`⏸ ${this.tasks.size} task${this.tasks.size === 1 ? "" : "s"} paused`,
-			);
+			this.runtimeCtx.ui.setStatus("pi-scheduler", `${this.tasks.size} task${this.tasks.size === 1 ? "" : "s"} paused`);
 			return;
 		}
 
 		const nextRunAt = Math.min(...enabled.map((t) => t.nextRunAt));
 		const next = new Date(nextRunAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-		const text = `⏰ ${enabled.length} active • next ${next}`;
+		const text = `${enabled.length} active • next ${next}`;
 		this.runtimeCtx.ui.setStatus("pi-scheduler", text);
 	}
 
@@ -799,10 +796,10 @@ export class SchedulerRuntime {
 			}
 
 			const options = list.map((task) => this.taskOptionLabel(task));
-			options.push("➕ Close");
+			options.push("+ Close");
 
 			const selected = await ctx.ui.select("Scheduled tasks (select one)", options);
-			if (!selected || selected === "➕ Close") {
+			if (!selected || selected === "+ Close") {
 				return;
 			}
 
@@ -832,8 +829,8 @@ export class SchedulerRuntime {
 			const title = `${task.id} • ${this.taskMode(task)} • next ${this.formatRelativeTime(task.nextRunAt)} (${this.formatClock(task.nextRunAt)})`;
 			const options = [
 				task.kind === "recurring" ? "⏱ Change schedule" : "⏱ Change reminder delay",
-				task.enabled ? "⏸ Disable" : "▶ Enable",
-				"▶ Run now",
+				task.enabled ? "Disable" : "Enable",
+				"Run now",
 				"🗑 Delete",
 				"↩ Back",
 				"✕ Close",
@@ -847,8 +844,8 @@ export class SchedulerRuntime {
 				return true;
 			}
 
-			if (action === "⏸ Disable" || action === "▶ Enable") {
-				const enabled = action === "▶ Enable";
+			if (action === "Disable" || action === "Enable") {
+				const enabled = action === "Enable";
 				this.setTaskEnabled(task.id, enabled);
 				ctx.ui.notify(`${enabled ? "Enabled" : "Disabled"} scheduled task ${task.id}.`, "info");
 				continue;
@@ -866,7 +863,7 @@ export class SchedulerRuntime {
 				return false;
 			}
 
-			if (action === "▶ Run now") {
+			if (action === "Run now") {
 				task.nextRunAt = Date.now();
 				task.pending = true;
 				this.persistTasks();
@@ -1054,7 +1051,7 @@ export class SchedulerRuntime {
 	}
 
 	private taskOptionLabel(task: ScheduleTask): string {
-		const state = task.enabled ? "✓" : "⏸";
+		const state = task.enabled ? "+" : "-";
 		return `${task.id} • ${state} ${this.taskMode(task)} • ${this.formatRelativeTime(task.nextRunAt)} • ${this.truncateText(task.prompt, 50)}`;
 	}
 

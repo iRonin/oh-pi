@@ -319,7 +319,7 @@ function renderSlotLines(slot: BtwSlot, parts: string[], helpers: WidgetThemeHel
 			parts[parts.length - 1] += warning(" ▍");
 		}
 	} else if (!slot.done) {
-		parts.push(`${dim("│ ")}${warning("⏳ thinking...")}`);
+		parts.push(`${dim("│ ")}${warning("thinking...")}`);
 	}
 
 	parts.push(`${dim("│ ")}${dim(`model: ${slot.modelLabel}`)}`);
@@ -576,7 +576,7 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 
-			slot.answer = `❌ ${error instanceof Error ? error.message : String(error)}`;
+			slot.answer = `[ERR] ${error instanceof Error ? error.message : String(error)}`;
 			slot.done = true;
 			renderWidget(ctx);
 			notify(ctx, error instanceof Error ? error.message : String(error), "error");
@@ -725,7 +725,7 @@ export default function (pi: ExtensionAPI) {
 			return;
 		}
 
-		widgetStatus = "⏳ summarizing...";
+		widgetStatus = "summarizing...";
 		renderWidget(ctx);
 
 		try {

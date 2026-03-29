@@ -229,7 +229,7 @@ export function renderSubagentResult(
 			c.addChild(new Text(truncLine(theme.fg("dim", `Skills: ${r.skills.join(", ")}`), w), 0, 0));
 		}
 		if (r.skillsWarning) {
-			c.addChild(new Text(truncLine(theme.fg("warning", `⚠️ ${r.skillsWarning}`), w), 0, 0));
+			c.addChild(new Text(truncLine(theme.fg("warning", `[!] ${r.skillsWarning}`), w), 0, 0));
 		}
 		c.addChild(new Text(truncLine(theme.fg("dim", formatUsage(r.usage, r.model)), w), 0, 0));
 		if (r.sessionFile) {
@@ -259,7 +259,7 @@ export function renderSubagentResult(
 	const icon = hasRunning
 		? theme.fg("warning", "...")
 		: hasEmptyWithoutTarget
-			? theme.fg("warning", "⚠")
+			? theme.fg("warning", "!")
 			: ok === d.results.length
 				? theme.fg("success", "ok")
 				: theme.fg("error", "X");
@@ -310,11 +310,11 @@ export function renderSubagentResult(
 							hasEmptyTextOutputWithoutOutputTarget(result.task, getFinalOutput(result.messages));
 						const isCurrent = i === (d.currentStepIndex ?? d.results.length);
 						const stepIcon = isFailed
-							? theme.fg("error", "✗")
+							? theme.fg("error", "x")
 							: isEmptyWithoutTarget
-								? theme.fg("warning", "⚠")
+								? theme.fg("warning", "!")
 								: isComplete
-									? theme.fg("success", "✓")
+									? theme.fg("success", "+")
 									: isCurrent && hasRunning
 										? theme.fg("warning", "●")
 										: theme.fg("dim", "○");
@@ -365,10 +365,10 @@ export function renderSubagentResult(
 		const statusIcon = rRunning
 			? theme.fg("warning", "●")
 			: r.exitCode !== 0
-				? theme.fg("error", "✗")
+				? theme.fg("error", "x")
 				: hasEmptyTextOutputWithoutOutputTarget(r.task, resultOutput)
-					? theme.fg("warning", "⚠")
-					: theme.fg("success", "✓");
+					? theme.fg("warning", "!")
+					: theme.fg("success", "+");
 		const stats = rProg ? ` | ${rProg.toolCount} tools, ${formatDuration(rProg.durationMs)}` : "";
 		const modelDisplay = r.model ? theme.fg("dim", ` (${r.model})`) : "";
 		const stepHeader = rRunning
@@ -389,7 +389,7 @@ export function renderSubagentResult(
 			c.addChild(new Text(truncLine(theme.fg("dim", `    skills: ${r.skills.join(", ")}`), w), 0, 0));
 		}
 		if (r.skillsWarning) {
-			c.addChild(new Text(truncLine(theme.fg("warning", `    ⚠️ ${r.skillsWarning}`), w), 0, 0));
+			c.addChild(new Text(truncLine(theme.fg("warning", `    [!] ${r.skillsWarning}`), w), 0, 0));
 		}
 
 		if (rRunning && rProg) {
