@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.1 (2026-03-30)
+
+### Fixes
+
+- avoid loading helper modules as extensions (#67)
+- run all workspace package builds (#68)
+- fix workspace builds to run every package build script, repair the spec worktree build config, and verify published extension entrypoints are explicit files.
+- fix pi package extension manifests to list explicit entrypoint files so helper modules are not loaded as standalone extensions.
+
 ## 0.4.0 (2026-03-30)
 
 ### Breaking Changes
