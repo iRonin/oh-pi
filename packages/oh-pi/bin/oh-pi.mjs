@@ -11,6 +11,9 @@
  */
 
 import { execFileSync } from "node:child_process";
+import process from "node:process";
+
+const IS_WINDOWS = process.platform === "win32";
 
 const PACKAGES = [
 	"@ifi/oh-pi-extensions",
@@ -76,21 +79,27 @@ ${PACKAGES.map((p) => `  • ${p}`).join("\n")}
 }
 
 function findPi() {
-	try {
-		execFileSync("pi", ["--version"], { stdio: "ignore" });
-		return "pi";
-	} catch {
-		console.error("Error: 'pi' command not found. Install pi-coding-agent first:");
-		console.error("  npm install -g @mariozechner/pi-coding-agent");
-		process.exit(1);
+	const candidates = IS_WINDOWS ? ["pi.cmd", "pi"] : ["pi"];
+
+	for (const cmd of candidates) {
+		try {
+			execFileSync(cmd, ["--version"], { stdio: "ignore", shell: IS_WINDOWS });
+			return cmd;
+		} catch {
+			// try next candidate
+		}
 	}
+
+	console.error("Error: 'pi' command not found. Install pi-coding-agent first:");
+	console.error("  npm install -g @mariozechner/pi-coding-agent");
+	process.exit(1);
 }
 
 function run(pi, command, args, { label }) {
 	const display = [pi, command, ...args].join(" ");
 	process.stdout.write(`  ${label} ... `);
 	try {
-		execFileSync(pi, [command, ...args], { stdio: "pipe", timeout: 60_000 });
+		execFileSync(pi, [command, ...args], { stdio: "pipe", timeout: 60_000, shell: IS_WINDOWS });
 		console.log("✓");
 	} catch (error) {
 		const stderr = error.stderr?.toString().trim();
