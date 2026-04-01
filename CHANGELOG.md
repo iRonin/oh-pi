@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.3 (2026-04-01)
+
+### Fixes
+
+- suppress watchdog and scheduler notification spam (#75)
+- suppress repeated watchdog and scheduler notifications by capping toast alerts at 2 per session and persisting ongoing warnings in the status bar instead.
+
 ## 0.4.2 (2026-03-31)
 
 ### Features
