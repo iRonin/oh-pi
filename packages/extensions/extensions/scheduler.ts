@@ -43,6 +43,7 @@ import {
 	getSchedulerLeasePath,
 	getSchedulerStoragePath,
 	getSchedulerStorageRoot,
+	MAX_DISPATCH_TIMESTAMPS,
 	MAX_DISPATCHES_PER_WINDOW,
 	MAX_TASKS,
 	MIN_RECURRING_INTERVAL,
@@ -50,6 +51,7 @@ import {
 	type ResumeReason,
 	SCHEDULER_LEASE_HEARTBEAT_MS,
 	SCHEDULER_LEASE_STALE_AFTER_MS,
+	SCHEDULER_SAFE_MODE_HEARTBEAT_MS,
 	type SchedulerLease,
 	type ScheduleScope,
 	type ScheduleTask,
@@ -87,12 +89,14 @@ export {
 	getSchedulerLeasePath,
 	getSchedulerStoragePath,
 	getSchedulerStorageRoot,
+	MAX_DISPATCH_TIMESTAMPS,
 	MAX_DISPATCHES_PER_WINDOW,
 	MAX_TASKS,
 	MIN_RECURRING_INTERVAL,
 	ONE_MINUTE,
 	SCHEDULER_LEASE_HEARTBEAT_MS,
 	SCHEDULER_LEASE_STALE_AFTER_MS,
+	SCHEDULER_SAFE_MODE_HEARTBEAT_MS,
 	THREE_DAYS,
 };
 
@@ -123,6 +127,7 @@ export class SchedulerRuntime {
 	private sessionId: string | null = null;
 	private dispatchMode: SchedulerDispatchMode = "auto";
 	private startupOwnershipHandled = false;
+	private safeModeEnabled = false;
 
 	constructor(private readonly pi: ExtensionAPI) {}
 
@@ -132,6 +137,32 @@ export class SchedulerRuntime {
 
 	get currentInstanceId(): string {
 		return this.instanceId;
+	}
+
+	get isSafeModeActive(): boolean {
+		return this.safeModeEnabled;
+	}
+
+	setSafeModeEnabled(enabled: boolean) {
+		if (this.safeModeEnabled === enabled) {
+			return;
+		}
+		this.safeModeEnabled = enabled;
+
+		if (enabled && this.runtimeCtx?.hasUI) {
+			this.runtimeCtx.ui.setStatus("pi-scheduler", undefined);
+			this.runtimeCtx.ui.setStatus("pi-scheduler-stale", undefined);
+		}
+
+		// Restart the scheduler timer with the appropriate interval.
+		if (this.schedulerTimer) {
+			this.restartSchedulerTimer();
+		}
+
+		// Restore status when leaving safe mode.
+		if (!enabled) {
+			this.updateStatus();
+		}
 	}
 
 	setRuntimeContext(ctx: ExtensionContext | undefined) {
@@ -405,11 +436,12 @@ export class SchedulerRuntime {
 		if (this.schedulerTimer) {
 			return;
 		}
+		const intervalMs = this.safeModeEnabled ? SCHEDULER_SAFE_MODE_HEARTBEAT_MS : SCHEDULER_LEASE_HEARTBEAT_MS;
 		this.schedulerTimer = setInterval(() => {
 			this.tickScheduler().catch(() => {
 				// Best-effort scheduler tick; errors are non-fatal.
 			});
-		}, SCHEDULER_LEASE_HEARTBEAT_MS);
+		}, intervalMs);
 		this.schedulerTimer.unref?.();
 	}
 
@@ -418,11 +450,27 @@ export class SchedulerRuntime {
 			clearInterval(this.schedulerTimer);
 			this.schedulerTimer = undefined;
 		}
+		this.dispatchTimestamps.length = 0;
 		this.releaseLeaseIfOwned();
+	}
+
+	private restartSchedulerTimer() {
+		if (!this.schedulerTimer) {
+			return;
+		}
+		clearInterval(this.schedulerTimer);
+		this.schedulerTimer = undefined;
+		this.startScheduler();
 	}
 
 	updateStatus() {
 		if (!this.runtimeCtx?.hasUI) {
+			return;
+		}
+		// In safe mode, suppress all status bar updates to reduce UI churn.
+		if (this.safeModeEnabled) {
+			this.runtimeCtx.ui.setStatus("pi-scheduler", undefined);
+			this.runtimeCtx.ui.setStatus("pi-scheduler-stale", undefined);
 			return;
 		}
 		// Clear the stale-task status hint when no tasks need review.
@@ -461,8 +509,17 @@ export class SchedulerRuntime {
 
 	private pruneDispatchHistory(now: number) {
 		const cutoff = now - DISPATCH_RATE_LIMIT_WINDOW_MS;
-		while (this.dispatchTimestamps.length > 0 && this.dispatchTimestamps[0] <= cutoff) {
-			this.dispatchTimestamps.shift();
+		// Find the first index that is still within the window to avoid O(n) shift() calls.
+		let firstValid = 0;
+		while (firstValid < this.dispatchTimestamps.length && this.dispatchTimestamps[firstValid] <= cutoff) {
+			firstValid++;
+		}
+		if (firstValid > 0) {
+			this.dispatchTimestamps.splice(0, firstValid);
+		}
+		// Hard cap to prevent unbounded growth from clock anomalies.
+		if (this.dispatchTimestamps.length > MAX_DISPATCH_TIMESTAMPS) {
+			this.dispatchTimestamps.splice(0, this.dispatchTimestamps.length - MAX_DISPATCH_TIMESTAMPS);
 		}
 	}
 
@@ -478,6 +535,10 @@ export class SchedulerRuntime {
 
 	private notifyRateLimit(now: number) {
 		if (!this.runtimeCtx?.hasUI) {
+			return;
+		}
+		// Suppress toast notifications in safe mode.
+		if (this.safeModeEnabled) {
 			return;
 		}
 		if (now - this.lastRateLimitNoticeAt < ONE_MINUTE) {
@@ -1371,7 +1432,7 @@ export class SchedulerRuntime {
 	}
 
 	notifyResumeRequiredTasks() {
-		if (!this.runtimeCtx?.hasUI) {
+		if (!this.runtimeCtx?.hasUI || this.safeModeEnabled) {
 			return;
 		}
 		const dueTasks = this.getSortedTasks().filter((task) => task.enabled && task.resumeRequired);

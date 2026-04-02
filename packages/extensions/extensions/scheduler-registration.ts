@@ -569,4 +569,9 @@ export function registerEvents(pi: ExtensionAPI, runtime: SchedulerRuntime) {
 		runtime.stopScheduler();
 		runtime.clearStatus(ctx);
 	});
+
+	// Listen for safe-mode changes to throttle scheduler ticks and suppress UI churn.
+	pi.events.on("oh-pi:safe-mode", (data) => {
+		runtime.setSafeModeEnabled(Boolean((data as { enabled?: boolean } | undefined)?.enabled));
+	});
 }

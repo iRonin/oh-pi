@@ -10,7 +10,9 @@ export const MIN_RECURRING_INTERVAL = ONE_MINUTE;
 export const DISPATCH_RATE_LIMIT_WINDOW_MS = ONE_MINUTE;
 export const MAX_DISPATCHES_PER_WINDOW = 6;
 export const SCHEDULER_LEASE_HEARTBEAT_MS = 1_000;
+export const SCHEDULER_SAFE_MODE_HEARTBEAT_MS = 5_000;
 export const SCHEDULER_LEASE_STALE_AFTER_MS = 10_000;
+export const MAX_DISPATCH_TIMESTAMPS = 64;
 
 export type TaskKind = "recurring" | "once";
 export type TaskStatus = "pending" | "success" | "error";
