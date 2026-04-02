@@ -2376,6 +2376,74 @@ describe("dispatch timestamp bounds", () => {
 	});
 });
 
+// ─── Lease heartbeat ────────────────────────────────────────────────────────
+
+describe("lease heartbeat refresh", () => {
+	let pi: ReturnType<typeof createMockPi>;
+	let runtime: SchedulerRuntime;
+	let writtenLeases: string[];
+
+	beforeEach(() => {
+		vi.useFakeTimers();
+		pi = createMockPi();
+		runtime = new SchedulerRuntime(pi as any);
+		writtenLeases = [];
+
+		// Track lease writes.
+		(writeFileSync as ReturnType<typeof vi.fn>).mockImplementation((_path: string, data: string) => {
+			if (typeof _path === "string" && _path.endsWith(".lease.json.tmp")) {
+				writtenLeases.push(data);
+			}
+		});
+		(renameSync as ReturnType<typeof vi.fn>).mockImplementation(() => {});
+		(mkdirSync as ReturnType<typeof vi.fn>).mockImplementation(() => {});
+		(rmSync as ReturnType<typeof vi.fn>).mockImplementation(() => {});
+	});
+
+	afterEach(() => {
+		runtime.stopScheduler();
+		vi.useRealTimers();
+		(existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+		(readFileSync as ReturnType<typeof vi.fn>).mockReturnValue("{}");
+	});
+
+	it("refreshes lease on every tick even when pi is not idle", async () => {
+		const now = Date.now();
+		// Set up a lease owned by this runtime.
+		const instanceId = runtime.currentInstanceId;
+		(existsSync as ReturnType<typeof vi.fn>).mockImplementation(
+			(file: string) =>
+				typeof file === "string" && (file.endsWith("scheduler.json") || file.endsWith("scheduler.lease.json")),
+		);
+		(readFileSync as ReturnType<typeof vi.fn>).mockImplementation((file: string) => {
+			if (typeof file === "string" && file.endsWith("scheduler.lease.json")) {
+				return JSON.stringify({
+					version: 1,
+					instanceId,
+					sessionId: null,
+					pid: process.pid,
+					cwd: "/mock-project",
+					heartbeatAt: now,
+				});
+			}
+			return JSON.stringify({ version: 1, tasks: [] });
+		});
+
+		// Create a context that is NOT idle.
+		const ctx = createMockCtx({ isIdle: () => false, hasPendingMessages: () => true });
+		runtime.setRuntimeContext(ctx as any);
+
+		// Tick — should still refresh the heartbeat even though pi is busy.
+		writtenLeases.length = 0;
+		await runtime.tickScheduler();
+
+		// The lease should have been refreshed.
+		expect(writtenLeases.length).toBeGreaterThanOrEqual(1);
+		const lastLease = JSON.parse(writtenLeases[writtenLeases.length - 1]);
+		expect(lastLease.instanceId).toBe(instanceId);
+	});
+});
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 describe("constants", () => {

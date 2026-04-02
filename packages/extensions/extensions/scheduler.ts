@@ -557,6 +557,14 @@ export class SchedulerRuntime {
 		}
 
 		const now = Date.now();
+
+		// Refresh the lease heartbeat unconditionally so other instances see this
+		// instance as alive even when pi is busy and not dispatching tasks. Without
+		// this, the lease goes stale after SCHEDULER_LEASE_STALE_AFTER_MS when the
+		// agent is processing messages, causing newer instances to grab the lease
+		// and mark this instance's tasks as stale_owner.
+		this.refreshLeaseHeartbeat(now);
+
 		let mutated = this.reconcileTaskOwnership();
 
 		for (const task of Array.from(this.tasks.values())) {
@@ -1145,6 +1153,17 @@ export class SchedulerRuntime {
 			fs.rmSync(this.leasePath, { force: true });
 		} catch {
 			// Best-effort cleanup.
+		}
+	}
+
+	private refreshLeaseHeartbeat(now = Date.now()) {
+		if (this.dispatchMode === "observer") {
+			return;
+		}
+		const status = this.getLeaseStatus(now);
+		// Only refresh if we already own the lease. Don't acquire or fight over it.
+		if (status.ownedByCurrent) {
+			this.writeLease(now, true);
 		}
 	}
 
