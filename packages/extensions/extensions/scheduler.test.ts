@@ -75,7 +75,9 @@ function createMockPi() {
 				const fns = eventBusHandlers.get(event);
 				if (fns) {
 					const idx = fns.indexOf(handler);
-					if (idx >= 0) fns.splice(idx, 1);
+					if (idx >= 0) {
+						fns.splice(idx, 1);
+					}
 				}
 			},
 			emit(event: string, ...args: any[]) {
