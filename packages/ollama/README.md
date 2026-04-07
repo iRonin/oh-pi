@@ -10,7 +10,7 @@ Experimental Ollama provider package for pi with both local and cloud support.
 - Discovers the current Ollama Cloud model catalog and stores it with the login credential
 - Exposes local models in `/model` as `ollama/<model-id>`
 - Exposes cloud models in `/model` as `ollama-cloud/<model-id>`
-- Adds `/ollama status|refresh-models|info` for a unified local + cloud workflow
+- Adds `/ollama status|refresh-models|models|info` for a unified local + cloud workflow
 
 ## Install
 
@@ -42,7 +42,8 @@ This package is intentionally separate from `@ifi/oh-pi` for now.
 
 - `/ollama status` — show local daemon status and cloud auth/catalog status
 - `/ollama refresh-models` — refresh both local and cloud Ollama models
-- `/ollama info <model>` — show known metadata for a local or cloud Ollama model
+- `/ollama models` — list local and cloud Ollama models with source/capability badges for easier selection
+- `/ollama info <model>` — show detailed metadata for a local or cloud Ollama model
 - `/ollama-cloud status` — backward-compatible cloud-only status alias
 - `/ollama-cloud refresh-models` — backward-compatible cloud-only refresh alias
 

@@ -18,6 +18,10 @@ export type OllamaProviderModel = {
 	maxTokens: number;
 	compat?: Model<Api>["compat"];
 	source?: OllamaModelSource;
+	family?: string;
+	parameterSize?: string;
+	quantization?: string;
+	capabilities?: string[];
 };
 
 export type OllamaCloudProviderModel = OllamaProviderModel;
@@ -35,6 +39,7 @@ type OllamaListedModel = {
 type OllamaShowResponse = {
 	capabilities?: unknown;
 	model_info?: Record<string, unknown>;
+	details?: Record<string, unknown>;
 };
 
 const DEFAULT_CONTEXT_WINDOW = 128_000;
@@ -148,7 +153,7 @@ export function toOllamaModel(model: Partial<OllamaProviderModel> & Pick<OllamaP
 	const maxTokens = normalizePositiveInteger(model.maxTokens, inferMaxTokens(contextWindow));
 	return {
 		id: model.id,
-		name: model.name?.trim() || formatDisplayName(model.id),
+		name: applySourceSuffix(model.name?.trim() || formatDisplayName(model.id), model.source),
 		reasoning: model.reasoning ?? false,
 		input: sanitizeInput(model.input),
 		cost: model.cost ? { ...model.cost } : { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -156,6 +161,10 @@ export function toOllamaModel(model: Partial<OllamaProviderModel> & Pick<OllamaP
 		maxTokens,
 		compat: { ...OLLAMA_OPENAI_COMPAT, ...(model.compat ?? {}) },
 		source: model.source,
+		family: sanitizeOptionalString(model.family),
+		parameterSize: sanitizeOptionalString(model.parameterSize),
+		quantization: sanitizeOptionalString(model.quantization),
+		capabilities: sanitizeCapabilities(model.capabilities),
 	};
 }
 
@@ -207,6 +216,7 @@ function cloneModel(model: OllamaProviderModel): OllamaProviderModel {
 		input: [...model.input],
 		cost: { ...model.cost },
 		compat: model.compat ? { ...model.compat } : undefined,
+		capabilities: model.capabilities ? [...model.capabilities] : undefined,
 	};
 }
 
@@ -232,6 +242,10 @@ function normalizeDiscoveredModel(
 		input: capabilitySet.has("vision") ? ["text", "image"] : (fallback?.input ?? ["text"]),
 		contextWindow,
 		maxTokens: fallback?.maxTokens ?? inferMaxTokens(contextWindow),
+		family: extractDetailField(payload.details, "family") ?? fallback?.family,
+		parameterSize: extractDetailField(payload.details, "parameter_size") ?? fallback?.parameterSize,
+		quantization: extractDetailField(payload.details, "quantization_level") ?? fallback?.quantization,
+		capabilities,
 	});
 }
 
@@ -292,6 +306,32 @@ function formatDisplayName(id: string): string {
 			return `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`;
 		})
 		.join(" ");
+}
+
+function applySourceSuffix(name: string, source: OllamaModelSource | undefined): string {
+	if (!source) {
+		return name;
+	}
+	if (/\((local|cloud)\)$/i.test(name)) {
+		return name;
+	}
+	return `${name} (${source === "local" ? "Local" : "Cloud"})`;
+}
+
+function sanitizeOptionalString(value: string | undefined): string | undefined {
+	return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function sanitizeCapabilities(capabilities: string[] | undefined): string[] | undefined {
+	if (!Array.isArray(capabilities) || capabilities.length === 0) {
+		return undefined;
+	}
+	return [...new Set(capabilities.map((capability) => capability.trim()).filter(Boolean))];
+}
+
+function extractDetailField(details: Record<string, unknown> | undefined, key: string): string | undefined {
+	const value = details?.[key];
+	return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 
 function createDiscoveryHeaders(apiKey?: string): Record<string, string> {

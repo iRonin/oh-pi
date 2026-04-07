@@ -5,7 +5,7 @@ export interface TestOllamaBackend {
 	apiUrl: string;
 	origin: string;
 	keysUrl: string;
-	setModels(models: Array<{ id: string; capabilities?: string[]; contextWindow?: number }>): void;
+	setModels(models: Array<{ id: string; capabilities?: string[]; contextWindow?: number; family?: string; parameterSize?: string; quantization?: string }>): void;
 	setRejectAuth(reject: boolean): void;
 	setRejectedModelShows(modelIds: string[]): void;
 	getAuthHeaders(): string[];
@@ -13,7 +13,7 @@ export interface TestOllamaBackend {
 }
 
 export async function createTestOllamaBackend(): Promise<TestOllamaBackend> {
-	let models: Array<{ id: string; capabilities?: string[]; contextWindow?: number }> = [];
+	let models: Array<{ id: string; capabilities?: string[]; contextWindow?: number; family?: string; parameterSize?: string; quantization?: string }> = [];
 	let rejectAuth = false;
 	let rejectedModelShows = new Set<string>();
 	const authHeaders: string[] = [];
@@ -64,6 +64,11 @@ export async function createTestOllamaBackend(): Promise<TestOllamaBackend> {
 					JSON.stringify({
 						capabilities: match.capabilities ?? ["completion", "tools"],
 						model_info: { [`${family}.context_length`]: match.contextWindow ?? 131072 },
+						details: {
+							family: match.family ?? family,
+							parameter_size: match.parameterSize ?? undefined,
+							quantization_level: match.quantization ?? undefined,
+						},
 					}),
 				);
 			});

@@ -98,7 +98,7 @@ async function refreshRegisteredCloudEnvModels(pi: ExtensionAPI): Promise<Ollama
 
 function registerOllamaCommands(pi: ExtensionAPI): void {
 	pi.registerCommand("ollama", {
-		description: "Inspect or refresh local + cloud Ollama providers: /ollama [status|refresh-models|info <model>]",
+		description: "Inspect or refresh local + cloud Ollama providers: /ollama [status|refresh-models|models|info <model>]",
 		async handler(args, ctx) {
 			const trimmed = args.trim();
 			const [rawAction = "status", ...rest] = trimmed ? trimmed.split(/\s+/) : ["status"];
@@ -113,6 +113,11 @@ function registerOllamaCommands(pi: ExtensionAPI): void {
 					? `${cloudModels.length} cloud available`
 					: "cloud not configured";
 				ctx.ui.notify(`Refreshed Ollama models (${localModels.length} local, ${cloudStatus}).`, "info");
+				return;
+			}
+
+			if (action === "models") {
+				ctx.ui.notify(renderModelList(collectOllamaModels(credential)), "info");
 				return;
 			}
 
@@ -180,15 +185,18 @@ function renderUnifiedStatus(credential: OllamaCloudCredentials | null): string 
 		: localDiscoveryState.lastRefresh
 			? "reachable"
 			: "probing";
+	const localRefresh = formatRefreshAge(localDiscoveryState.lastRefresh);
+	const cloudRefresh = formatRefreshAge(credential?.lastModelRefresh ?? cloudEnvDiscoveryState.lastRefresh);
 	const cloudModels = credential ? getCredentialModels(credential) : cloudEnvDiscoveryState.models;
 	const cloudAuth = credential ? "stored via /login" : process.env[OLLAMA_CLOUD_API_KEY_ENV]?.trim() ? "environment only" : "not configured";
 	return [
 		`Ollama local: ${localState}`,
-		`Local models: ${localDiscoveryState.models.length}`,
+		`Local models: ${localDiscoveryState.models.length}${localRefresh}`,
 		`Local base URL: ${localConfig.apiUrl}`,
 		`Ollama cloud auth: ${cloudAuth}`,
-		`Cloud models: ${cloudModels.length}`,
+		`Cloud models: ${cloudModels.length}${cloudRefresh}`,
 		`Cloud base URL: ${cloudConfig.apiUrl}`,
+		`Tip: run /ollama models to compare local and cloud choices.`,
 	].join("\n");
 }
 
@@ -198,7 +206,7 @@ function renderCloudStatus(credential: OllamaCloudCredentials | null): string {
 	const cloudAuth = credential ? "stored via /login" : process.env[OLLAMA_CLOUD_API_KEY_ENV]?.trim() ? "environment only" : "not configured";
 	return [
 		`Ollama cloud auth: ${cloudAuth}`,
-		`Cloud models: ${cloudModels.length}`,
+		`Cloud models: ${cloudModels.length}${formatRefreshAge(credential?.lastModelRefresh ?? cloudEnvDiscoveryState.lastRefresh)}`,
 		`Cloud base URL: ${config.apiUrl}`,
 	].join("\n");
 }
@@ -233,15 +241,108 @@ function findModelForQuery(
 }
 
 function renderModelInfo(model: OllamaProviderModel & { provider: string; baseUrl: string }): string {
-	return [
-		`${model.provider}/${model.id}`,
+	const lines = [
+		`${sourceIcon(model.provider)} ${model.provider}/${model.id}`,
 		`Name: ${model.name}`,
+		`Source: ${model.provider === OLLAMA_LOCAL_PROVIDER ? "Local Ollama daemon" : "Ollama Cloud"}`,
 		`Inputs: ${model.input.join(", ")}`,
 		`Reasoning: ${model.reasoning ? "yes" : "no"}`,
 		`Context window: ${model.contextWindow.toLocaleString()}`,
 		`Max tokens: ${model.maxTokens.toLocaleString()}`,
 		`Base URL: ${model.baseUrl}`,
-	].join("\n");
+	];
+	if (model.family) {
+		lines.splice(4, 0, `Family: ${model.family}`);
+	}
+	if (model.parameterSize) {
+		lines.splice(5, 0, `Parameter size: ${model.parameterSize}`);
+	}
+	if (model.quantization) {
+		lines.splice(6, 0, `Quantization: ${model.quantization}`);
+	}
+	const capabilitySummary = summarizeCapabilities(model);
+	if (capabilitySummary) {
+		lines.splice(lines.length - 1, 0, `Capabilities: ${capabilitySummary}`);
+	}
+	return lines.join("\n");
+}
+
+function renderModelList(models: Array<OllamaProviderModel & { provider: string; baseUrl: string }>): string {
+	if (models.length === 0) {
+		return "No Ollama models are currently registered. Run /ollama refresh-models.";
+	}
+	const sections = [
+		{
+			title: "Local",
+			models: models.filter((model) => model.provider === OLLAMA_LOCAL_PROVIDER),
+		},
+		{
+			title: "Cloud",
+			models: models.filter((model) => model.provider === OLLAMA_CLOUD_PROVIDER),
+		},
+	].filter((section) => section.models.length > 0);
+	return sections
+		.map((section) => [
+			`Ollama ${section.title}:`,
+			...section.models
+				.sort((left, right) => left.id.localeCompare(right.id))
+				.map(
+					(model) =>
+						`  ${sourceIcon(model.provider)} ${model.provider}/${model.id} — ${model.name}${renderModelBadges(model)} · ${model.contextWindow.toLocaleString()} ctx`,
+				),
+		].join("\n"))
+		.join("\n\n");
+}
+
+function renderModelBadges(model: OllamaProviderModel): string {
+	const badges: string[] = [];
+	if (model.input.includes("image")) {
+		badges.push("vision");
+	}
+	if (model.reasoning) {
+		badges.push("reasoning");
+	}
+	if (model.parameterSize) {
+		badges.push(model.parameterSize);
+	}
+	return badges.length > 0 ? ` [${badges.join(" · ")}]` : "";
+}
+
+function summarizeCapabilities(model: OllamaProviderModel): string | null {
+	const values = new Set<string>();
+	for (const capability of model.capabilities ?? []) {
+		values.add(capability);
+	}
+	if (model.input.includes("image")) {
+		values.add("vision");
+	}
+	if (model.reasoning) {
+		values.add("thinking");
+	}
+	return values.size > 0 ? [...values].join(", ") : null;
+}
+
+function sourceIcon(provider: string): string {
+	return provider === OLLAMA_LOCAL_PROVIDER ? "⌂" : "☁";
+}
+
+function formatRefreshAge(timestamp: number | null | undefined): string {
+	if (!timestamp) {
+		return "";
+	}
+	const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
+	if (seconds < 5) {
+		return " (just refreshed)";
+	}
+	if (seconds < 60) {
+		return ` (${seconds}s ago)`;
+	}
+	const minutes = Math.round(seconds / 60);
+	if (minutes < 60) {
+		return ` (${minutes}m ago)`;
+	}
+	const hours = Math.round(minutes / 60);
+	return ` (${hours}h ago)`;
 }
 
 function getStoredCloudCredential(ctx: { modelRegistry: { authStorage: { get: (provider: string) => unknown } } }): OllamaCloudCredentials | null {
