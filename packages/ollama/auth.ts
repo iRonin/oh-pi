@@ -1,6 +1,6 @@
 import type { OAuthCredentials, OAuthLoginCallbacks, OAuthProviderInterface } from "@mariozechner/pi-ai";
 import {
-	OLLAMA_CLOUD_API,
+	OLLAMA_API,
 	OLLAMA_CLOUD_API_KEY_ENV,
 	OLLAMA_CLOUD_AUTH_DOCS_URL,
 	OLLAMA_CLOUD_PROVIDER,
@@ -64,7 +64,7 @@ export function createOllamaCloudOAuthProvider(): Omit<OAuthProviderInterface, "
 				...current.map((model) => ({
 					...model,
 					provider: OLLAMA_CLOUD_PROVIDER,
-					api: OLLAMA_CLOUD_API,
+					api: OLLAMA_API,
 					baseUrl: config.apiUrl,
 				})),
 			];

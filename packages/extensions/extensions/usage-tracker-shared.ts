@@ -59,7 +59,7 @@ export interface WindowPace {
 	willLastToReset: boolean;
 }
 
-export type ProviderKey = "anthropic" | "openai" | "google";
+export type ProviderKey = "anthropic" | "openai" | "google" | "ollama";
 
 export interface ProviderRateLimits {
 	provider: ProviderKey;

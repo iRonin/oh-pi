@@ -55,6 +55,7 @@ import {
 	hasProviderDisplayData,
 	probeAnthropicDirect,
 	probeGoogleDirect,
+	probeOllamaDirect,
 	probeOpenAIDirect,
 	providerDisplayName,
 	readPiAuth,
@@ -241,7 +242,14 @@ export default function usageTracker(pi: ExtensionAPI) {
 			return null;
 		}
 		const candidate = value as Partial<ProviderRateLimits> & { windows?: unknown };
-		if (!(candidate.provider === "anthropic" || candidate.provider === "openai" || candidate.provider === "google")) {
+		if (
+			!(
+				candidate.provider === "anthropic" ||
+				candidate.provider === "openai" ||
+				candidate.provider === "google" ||
+				candidate.provider === "ollama"
+			)
+		) {
 			return null;
 		}
 		const windows = Array.isArray(candidate.windows)
@@ -569,6 +577,21 @@ export default function usageTracker(pi: ExtensionAPI) {
 		probeInFlight.add(provider);
 		try {
 			const auth = readPiAuth();
+			if (provider === "ollama") {
+				const ollamaEntry = auth["ollama-cloud"];
+				const envToken = process.env.OLLAMA_API_KEY?.trim() || null;
+				const fresh = envToken
+					? { token: envToken, entry: ollamaEntry }
+					: ollamaEntry?.access
+						? await ensureFreshToken("ollama-cloud", ollamaEntry, auth)
+						: null;
+				const limits = await probeOllamaDirect(fresh?.token ?? null);
+				rateLimits.set(provider, limits);
+				saveRateLimitCache();
+				lastProbeTime.set(provider, Date.now());
+				return;
+			}
+
 			let authKey: string | null = null;
 			let authEntry: PiAuthEntry | undefined;
 
@@ -588,7 +611,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 					credits: null,
 					account: null,
 					plan: null,
-					note: `No pi auth configured for ${providerDisplayName(provider)} \u2014 run pi login.`,
+					note: `No pi auth configured for ${providerDisplayName(provider)} — run pi login.`,
 					probedAt: now,
 					error: null,
 				});
@@ -608,7 +631,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 					plan: null,
 					note: null,
 					probedAt: now,
-					error: `${providerDisplayName(provider)} token refresh failed \u2014 re-authenticate with pi login.`,
+					error: `${providerDisplayName(provider)} token refresh failed — re-authenticate with pi login.`,
 				});
 				saveRateLimitCache();
 				lastProbeTime.set(provider, now);
@@ -625,6 +648,9 @@ export default function usageTracker(pi: ExtensionAPI) {
 					break;
 				case "google":
 					limits = await probeGoogleDirect(fresh.token, fresh.entry);
+					break;
+				case "ollama":
+					limits = await probeOllamaDirect(fresh.token);
 					break;
 			}
 
@@ -656,7 +682,14 @@ export default function usageTracker(pi: ExtensionAPI) {
 			return;
 		}
 		const id = model.id.toLowerCase();
-		// Detect provider from model ID
+		const provider =
+			typeof (model as { provider?: unknown }).provider === "string"
+				? String((model as { provider?: unknown }).provider).toLowerCase()
+				: "";
+		// Detect provider from model ID / provider id
+		if (provider === "ollama" || provider === "ollama-cloud") {
+			probeProvider("ollama", force);
+		}
 		if (id.includes("claude") || id.includes("sonnet") || id.includes("opus") || id.includes("haiku")) {
 			probeProvider("anthropic", force);
 		}
@@ -681,6 +714,21 @@ export default function usageTracker(pi: ExtensionAPI) {
 				seen.add(provider);
 				probeProvider(provider, force);
 			}
+		}
+		const activeProvider =
+			activeCtx?.model && typeof (activeCtx.model as { provider?: unknown }).provider === "string"
+				? String((activeCtx.model as { provider?: unknown }).provider).toLowerCase()
+				: "";
+		const shouldProbeOllama =
+			Boolean(
+				process.env.OLLAMA_API_KEY?.trim() || process.env.OLLAMA_HOST?.trim() || process.env.OLLAMA_HOST_CLOUD?.trim(),
+			) ||
+			activeProvider === "ollama" ||
+			activeProvider === "ollama-cloud" ||
+			[...models.values()].some((model) => model.provider === "ollama" || model.provider === "ollama-cloud");
+		if (shouldProbeOllama && !seen.has("ollama")) {
+			seen.add("ollama");
+			probeProvider("ollama", force);
 		}
 	}
 
@@ -1245,7 +1293,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 		name: "usage_report",
 		label: "Usage Report",
 		description:
-			"Generate a rate limit status and token usage report. Shows provider rate limits (Anthropic, OpenAI, Google) using pi-managed auth, plus per-model costs. Use when the user asks about spending, rate limits, quotas, or remaining usage.",
+			"Generate a rate limit status and token usage report. Shows provider rate limits (Anthropic, OpenAI, Google) and best-effort Ollama status, plus per-model costs. Use when the user asks about spending, rate limits, quotas, or remaining usage.",
 		promptSnippet: "Show provider rate limits (% remaining, reset time) and session usage/cost report.",
 		parameters: Type.Object({
 			format: Type.Optional(

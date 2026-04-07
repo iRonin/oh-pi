@@ -1,7 +1,7 @@
 {
-	"name": "@ifi/pi-provider-ollama-cloud",
+	"name": "@ifi/pi-provider-ollama",
 	"version": "0.4.4",
-	"description": "Experimental Ollama Cloud provider for pi with /login support and dynamic model discovery.",
+	"description": "Experimental Ollama provider for pi with local discovery and cloud login support.",
 	"type": "module",
 	"keywords": [
 		"pi-package",
@@ -9,6 +9,7 @@
 		"pi-coding-agent",
 		"ollama",
 		"provider",
+		"local",
 		"cloud",
 		"experimental"
 	],

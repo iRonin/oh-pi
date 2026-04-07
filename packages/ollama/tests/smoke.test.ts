@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { createExtensionHarness } from "../../../test-utils/extension-runtime-harness.js";
-import ollamaCloudProviderExtension from "../index.js";
+import ollamaProviderExtension from "../index.js";
 
-describe("ollama cloud provider smoke tests", () => {
-	it("registers the ollama cloud provider and command without crashing", () => {
+describe("ollama provider smoke tests", () => {
+	it("registers local + cloud ollama providers and commands without crashing", () => {
 		const harness = createExtensionHarness();
-		ollamaCloudProviderExtension(harness.pi as never);
+		ollamaProviderExtension(harness.pi as never);
 
+		expect(harness.commands.has("ollama")).toBe(true);
 		expect(harness.commands.has("ollama-cloud")).toBe(true);
+		expect(harness.providers.has("ollama")).toBe(true);
 		expect(harness.providers.has("ollama-cloud")).toBe(true);
 	});
 });

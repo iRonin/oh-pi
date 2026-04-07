@@ -17,6 +17,7 @@ export const AUTH_KEY_TO_PROVIDER: Record<string, ProviderKey> = {
 	"openai-codex": "openai",
 	"google-antigravity": "google",
 	"google-gemini-cli": "google",
+	"ollama-cloud": "ollama",
 };
 
 /** Provider API base URLs used by direct usage/rate-limit probes. */
@@ -24,6 +25,7 @@ const PROVIDER_API_BASE: Record<ProviderKey, string> = {
 	anthropic: "https://api.anthropic.com",
 	openai: "https://chatgpt.com/backend-api",
 	google: "https://cloudcode-pa.googleapis.com",
+	ollama: "https://ollama.com",
 };
 
 /**
@@ -146,6 +148,11 @@ export async function ensureFreshToken(
 ): Promise<{ token: string; entry: PiAuthEntry } | null> {
 	if (Date.now() < entry.expires && entry.access) {
 		return { token: entry.access, entry };
+	}
+
+	if (authKey === "ollama-cloud") {
+		const token = entry.access || entry.refresh;
+		return token ? { token, entry: { ...entry, access: token, refresh: entry.refresh || token } } : null;
 	}
 
 	// Token expired — try refreshing via pi's OAuth module
@@ -737,6 +744,128 @@ export async function probeGoogleDirect(token: string, authEntry?: PiAuthEntry):
 	return result;
 }
 
+function getEnv(name: string): string | null {
+	const value = process.env[name];
+	return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function stripTrailingSlash(value: string): string {
+	return value.replace(/\/+$/, "");
+}
+
+function normalizeOllamaApiUrl(value: string, fallbackOrigin: string): string {
+	try {
+		const url = new URL(value);
+		if (url.pathname === "" || url.pathname === "/") {
+			url.pathname = "/v1";
+		}
+		url.search = "";
+		url.hash = "";
+		return stripTrailingSlash(url.toString());
+	} catch {
+		return `${stripTrailingSlash(fallbackOrigin)}/v1`;
+	}
+}
+
+function deriveOllamaOrigin(apiUrl: string, fallbackOrigin: string): string {
+	try {
+		const url = new URL(apiUrl);
+		url.pathname = "";
+		url.search = "";
+		url.hash = "";
+		return stripTrailingSlash(url.toString());
+	} catch {
+		return stripTrailingSlash(fallbackOrigin);
+	}
+}
+
+function maybeAddGenericRateLimitWindow(
+	result: ProviderRateLimits,
+	headers: Headers | { get: (key: string) => string | null },
+): void {
+	const limit = parseFiniteNumber(headers.get("x-ratelimit-limit") ?? headers.get("ratelimit-limit"));
+	const remaining = parseFiniteNumber(headers.get("x-ratelimit-remaining") ?? headers.get("ratelimit-remaining"));
+	const reset = headers.get("x-ratelimit-reset") ?? headers.get("ratelimit-reset");
+	if (limit === null || remaining === null || limit <= 0) {
+		return;
+	}
+	upsertWindow(result.windows, {
+		label: `Requests (${fmtTokens(Math.round(limit))}/win)`,
+		percentLeft: clampPercent((remaining / limit) * 100),
+		resetDescription: reset ? resetCountdown(reset) : null,
+		windowMinutes: null,
+	});
+}
+
+export async function probeOllamaDirect(token: string | null): Promise<ProviderRateLimits> {
+	const result: ProviderRateLimits = {
+		provider: "ollama",
+		windows: [],
+		credits: null,
+		account: null,
+		plan: token ? "API key" : null,
+		note: null,
+		probedAt: Date.now(),
+		error: null,
+	};
+
+	const localBase = normalizeOllamaApiUrl(getEnv("OLLAMA_HOST") ?? "http://127.0.0.1:11434", "http://127.0.0.1:11434");
+	const cloudBase = normalizeOllamaApiUrl(
+		getEnv("OLLAMA_HOST_CLOUD") ?? PROVIDER_API_BASE.ollama,
+		PROVIDER_API_BASE.ollama,
+	);
+	const localOrigin = deriveOllamaOrigin(localBase, "http://127.0.0.1:11434");
+
+	let localNote: string;
+	try {
+		const response = await fetch(`${localBase}/models`, {
+			method: "GET",
+			signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+		});
+		if (response.ok) {
+			const payload = (await response.json()) as { data?: Array<{ id?: string }> };
+			localNote = `Local daemon reachable at ${localOrigin} (${payload.data?.length ?? 0} model(s)).`;
+		} else {
+			localNote = `Local daemon unavailable at ${localOrigin} (${response.status}).`;
+		}
+	} catch {
+		localNote = `Local daemon unavailable at ${localOrigin}.`;
+	}
+
+	let cloudNote: string;
+	if (token) {
+		try {
+			const response = await fetch(`${cloudBase}/models`, {
+				method: "GET",
+				headers: { authorization: `Bearer ${token}` },
+				signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+			});
+			if (response.status === 401) {
+				cloudNote = "Cloud auth was rejected — run /login ollama-cloud again.";
+			} else if (response.ok) {
+				const payload = (await response.json()) as { data?: Array<{ id?: string }> };
+				maybeAddGenericRateLimitWindow(result, response.headers);
+				cloudNote = `Cloud auth configured (${payload.data?.length ?? 0} model(s)).`;
+			} else {
+				cloudNote = `Cloud API returned ${response.status}.`;
+			}
+		} catch {
+			cloudNote = "Cloud API unavailable.";
+		}
+	} else {
+		cloudNote = "Cloud auth not configured.";
+	}
+
+	result.note = `${localNote} ${cloudNote}`;
+	if (result.windows.length === 0) {
+		result.note = appendNote(
+			result.note,
+			"Ollama does not currently expose a documented quota endpoint to pi, so remaining account limits are unavailable.",
+		);
+	}
+	return result;
+}
+
 export function hasProviderDisplayData(rl: ProviderRateLimits): boolean {
 	return rl.windows.length > 0 || rl.credits !== null || Boolean(rl.account || rl.plan || rl.note || rl.error);
 }
@@ -761,5 +890,7 @@ export function providerDisplayName(provider: ProviderKey): string {
 			return "OpenAI";
 		case "google":
 			return "Google";
+		case "ollama":
+			return "Ollama";
 	}
 }

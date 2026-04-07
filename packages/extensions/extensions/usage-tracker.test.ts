@@ -211,7 +211,7 @@ function createMockCtx(entries: any[] = []) {
 	return {
 		sessionManager: { getBranch: () => entries },
 		getContextUsage: () => ({ tokens: 45000, contextWindow: 200000, percent: 22.5 }),
-		model: { id: "claude-sonnet-4-20250514" },
+		model: { id: "claude-sonnet-4-20250514", provider: "anthropic" },
 		ui: {
 			setWidget(key: string, content: any) {
 				if (content === undefined) {
@@ -628,6 +628,73 @@ describe("usage-tracker extension", () => {
 			expect(text).toContain("1 turns");
 			expect(text).toContain("in /");
 			expect(text).toContain("30d:");
+		});
+
+		it("shows best-effort Ollama status for local models", async () => {
+			mockFetch.mockImplementation((url: string) => {
+				if (url.includes("127.0.0.1:11434/v1/models")) {
+					return Promise.resolve(makeFetchResponse({ body: { data: [{ id: "gemma3:4b" }] } }));
+				}
+				return Promise.resolve(makeFetchResponse());
+			});
+
+			const ollamaCtx = createMockCtx();
+			ollamaCtx.model = { id: "gemma3:4b", provider: "ollama" };
+
+			usageTracker(pi as any);
+			pi._emit("session_start", { type: "session_start" }, ollamaCtx);
+			pi._emit(
+				"turn_end",
+				{
+					type: "turn_end",
+					turnIndex: 0,
+					message: makeAssistantMessage({ model: "gemma3:4b", provider: "ollama", api: "openai-completions" }),
+					toolResults: [],
+				},
+				ollamaCtx,
+			);
+
+			const tool = pi._tools.get("usage_report");
+			const result = await runWithTimers(() =>
+				tool.execute("id", { format: "detailed" }, undefined, undefined, ollamaCtx),
+			);
+			const text = result.content[0].text;
+			expect(text).toContain("Ollama Rate Limits:");
+			expect(text).toContain("Local daemon reachable");
+			expect(text).toContain("remaining account limits are unavailable");
+		});
+
+		it("shows Ollama cloud rate headers when available", async () => {
+			process.env.OLLAMA_API_KEY = "test-key";
+			mockFetch.mockImplementation((url: string) => {
+				if (url.includes("127.0.0.1:11434/v1/models")) {
+					return Promise.resolve(makeFetchResponse({ status: 503, ok: false }));
+				}
+				if (url.includes("ollama.com/v1/models")) {
+					return Promise.resolve(
+						makeFetchResponse({
+							headers: { "x-ratelimit-limit": "100", "x-ratelimit-remaining": "75", "x-ratelimit-reset": "60s" },
+							body: { data: [{ id: "gpt-oss:20b" }] },
+						}),
+					);
+				}
+				return Promise.resolve(makeFetchResponse());
+			});
+
+			const ollamaCtx = createMockCtx();
+			ollamaCtx.model = { id: "gpt-oss:20b", provider: "ollama-cloud" };
+
+			usageTracker(pi as any);
+			pi._emit("session_start", { type: "session_start" }, ollamaCtx);
+
+			const tool = pi._tools.get("usage_report");
+			const result = await runWithTimers(() =>
+				tool.execute("id", { format: "detailed" }, undefined, undefined, ollamaCtx),
+			);
+			const text = result.content[0].text;
+			expect(text).toContain("Ollama Rate Limits:");
+			expect(text).toContain("75% left");
+			expect(text).toContain("Cloud auth configured (1 model(s)).");
 		});
 
 		it("shows rate limit windows from Anthropic OAuth usage endpoint", async () => {

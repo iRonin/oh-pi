@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createOllamaCloudOAuthProvider, loginOllamaCloud, refreshOllamaCloudCredential } from "../auth.js";
-import { createTestOllamaCloudBackend } from "./test-backend.js";
+import { createTestOllamaBackend } from "./test-backend.js";
 
 const envSnapshot = { ...process.env };
 
@@ -15,11 +15,11 @@ afterEach(() => {
 
 describe("ollama cloud auth", () => {
 	it("opens the keys page and exchanges a pasted API key for a static credential with discovered models", async () => {
-		const backend = await createTestOllamaCloudBackend();
+		const backend = await createTestOllamaBackend();
 		backend.setModels([{ id: "gpt-oss:120b", capabilities: ["completion", "tools", "thinking"], contextWindow: 131072 }]);
 		process.env.PI_OLLAMA_CLOUD_API_URL = backend.apiUrl;
 		process.env.PI_OLLAMA_CLOUD_MODELS_URL = `${backend.apiUrl}/models`;
-		process.env.PI_OLLAMA_CLOUD_SHOW_URL = `${backend.apiUrl.replace(/\/v1$/, "")}/api/show`;
+		process.env.PI_OLLAMA_CLOUD_SHOW_URL = `${backend.origin}/api/show`;
 		process.env.PI_OLLAMA_CLOUD_KEYS_URL = backend.keysUrl;
 
 		let openedUrl = "";
@@ -37,17 +37,17 @@ describe("ollama cloud auth", () => {
 	});
 
 	it("refreshes credentials and preserves discovered models when discovery fails", async () => {
-		const backend = await createTestOllamaCloudBackend();
+		const backend = await createTestOllamaBackend();
 		backend.setRejectAuth(true);
 		process.env.PI_OLLAMA_CLOUD_API_URL = backend.apiUrl;
 		process.env.PI_OLLAMA_CLOUD_MODELS_URL = `${backend.apiUrl}/models`;
-		process.env.PI_OLLAMA_CLOUD_SHOW_URL = `${backend.apiUrl.replace(/\/v1$/, "")}/api/show`;
+		process.env.PI_OLLAMA_CLOUD_SHOW_URL = `${backend.origin}/api/show`;
 
 		const refreshed = await refreshOllamaCloudCredential({
 			refresh: "test-key",
 			access: "test-key",
 			expires: Date.now() - 1000,
-			models: [{ id: "qwen3-next:80b", name: "Qwen3 Next 80B", reasoning: true, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 262144, maxTokens: 32768 }],
+			models: [{ id: "qwen3-next:80b", name: "Qwen3 Next 80B", reasoning: true, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 262144, maxTokens: 32768, source: "cloud" }],
 		} as never);
 
 		expect(refreshed.models?.[0]?.id).toBe("qwen3-next:80b");
@@ -64,7 +64,7 @@ describe("ollama cloud auth", () => {
 				refresh: "r",
 				access: "a",
 				expires: Date.now() + 1000,
-				models: [{ id: "gpt-oss:120b", name: "GPT OSS 120B", reasoning: true, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131072, maxTokens: 16384 }],
+				models: [{ id: "gpt-oss:120b", name: "GPT OSS 120B", reasoning: true, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 131072, maxTokens: 16384, source: "cloud" }],
 			} as never,
 		);
 
