@@ -24,6 +24,7 @@ describe("pi package extension entrypoints", () => {
 			"packages/spec/package.json",
 			"packages/ant-colony/package.json",
 			"packages/cursor/package.json",
+			"packages/ollama/package.json",
 		];
 
 		for (const packagePath of extensionPackages) {
