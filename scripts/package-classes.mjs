@@ -18,6 +18,7 @@ export const publishedPackages = [
 	{ name: "@ifi/pi-plan", dir: "packages/plan" },
 	{ name: "@ifi/pi-spec", dir: "packages/spec" },
 	{ name: "@ifi/pi-provider-cursor", dir: "packages/cursor" },
+	{ name: "@ifi/pi-provider-ollama-cloud", dir: "packages/ollama" },
 	{ name: "@ifi/pi-web-remote", dir: "packages/web-remote" },
 	{ name: "@ifi/oh-pi", dir: "packages/oh-pi" },
 ];

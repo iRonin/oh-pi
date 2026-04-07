@@ -16,6 +16,7 @@ const SMOKE_TESTS = [
 	"packages/subagents/tests/smoke.test.ts",
 	"packages/spec/tests/smoke.test.ts",
 	"packages/cursor/tests/smoke.test.ts",
+	"packages/ollama/tests/smoke.test.ts",
 ];
 
 function parseArgs(argv) {

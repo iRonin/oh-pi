@@ -19,6 +19,8 @@ versioned_files = [
   "packages/shared-qna/package.json",
   "packages/plan/package.json",
   "packages/spec/package.json",
+  "packages/cursor/package.json",
+  "packages/ollama/package.json",
   "packages/oh-pi/package.json",
   "packages/web-server/package.json",
   "packages/web-remote/package.json",
