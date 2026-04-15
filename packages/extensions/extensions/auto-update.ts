@@ -5,17 +5,29 @@
  * If a newer version is found, shows a toast notification with upgrade instructions.
  * The check runs in a `setTimeout` to avoid blocking session startup.
  */
-import { execSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { type ExtensionAPI, getAgentDir } from "@mariozechner/pi-coding-agent";
+
+const IS_WINDOWS = process.platform === "win32";
 
 /** Minimum interval between version checks (24 hours). */
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000;
 
 /** Stamp file path — stores the timestamp of the last version check. */
 const STAMP_FILE = join(getAgentDir(), ".update-check");
+
+export type AutoUpdateCheckDependencies = {
+	readStamp?: () => number;
+	writeStamp?: () => void;
+	getCurrentVersion?: () => Promise<string | null> | string | null;
+	getLatestVersion?: () => Promise<string | null> | string | null;
+	now?: () => number;
+	notify?: (message: string) => void;
+};
 
 /** Read the last-check timestamp from the stamp file. Returns 0 if missing or unreadable. */
 function readStamp(): number {
@@ -36,32 +48,56 @@ function writeStamp(): void {
 	}
 }
 
+function execFileText(command: string, args: string[], timeout = 8_000): Promise<string | null> {
+	return new Promise((resolve) => {
+		execFile(command, args, { encoding: "utf8", timeout, shell: IS_WINDOWS }, (error, stdout) => {
+			if (error) {
+				resolve(null);
+				return;
+			}
+
+			const text = stdout.trim();
+			resolve(text || null);
+		});
+	});
+}
+
 /** Query the npm registry for the latest published version of oh-pi. */
-function getLatestVersion(): string | null {
-	try {
-		return execSync("npm view oh-pi version", { encoding: "utf8", timeout: 8000 }).trim();
-	} catch {
-		return null;
-	}
+async function getLatestVersion(): Promise<string | null> {
+	return execFileText("npm", ["view", "oh-pi", "version"]);
 }
 
 /**
  * Determine the currently installed oh-pi version.
  * Tries reading the local package.json first, falls back to `npm list -g`.
  */
-function getCurrentVersion(): string | null {
+async function getCurrentVersion(): Promise<string | null> {
 	try {
 		const currentDir = dirname(fileURLToPath(import.meta.url));
 		const pkgPath = join(currentDir, "..", "..", "package.json");
 		if (existsSync(pkgPath)) {
-			return JSON.parse(readFileSync(pkgPath, "utf8")).version;
+			const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as { version?: unknown };
+			return typeof pkg.version === "string" ? pkg.version : null;
 		}
 	} catch {
 		// package.json not found at expected location
 	}
+
+	const output = await execFileText("npm", ["list", "-g", "oh-pi", "--json", "--depth=0"]);
+	if (!output) {
+		return null;
+	}
+
 	try {
-		const out = JSON.parse(execSync("npm list -g oh-pi --json --depth=0", { encoding: "utf8", timeout: 8000 }));
-		return out.dependencies?.["oh-pi"]?.version ?? null;
+		const parsed = JSON.parse(output) as {
+			dependencies?: {
+				"oh-pi"?: {
+					version?: unknown;
+				};
+			};
+		};
+		const version = parsed.dependencies?.["oh-pi"]?.version;
+		return typeof version === "string" ? version : null;
 	} catch {
 		return null;
 	}
@@ -91,6 +127,29 @@ export function isNewer(latest: string, current: string): boolean {
 	return false;
 }
 
+export async function runAutoUpdateCheck(deps: AutoUpdateCheckDependencies = {}): Promise<string | null> {
+	const now = deps.now ?? Date.now;
+	const read = deps.readStamp ?? readStamp;
+	const write = deps.writeStamp ?? writeStamp;
+	const resolveCurrentVersion = deps.getCurrentVersion ?? getCurrentVersion;
+	const resolveLatestVersion = deps.getLatestVersion ?? getLatestVersion;
+
+	if (now() - read() < CHECK_INTERVAL) {
+		return null;
+	}
+
+	write();
+
+	const [current, latest] = await Promise.all([resolveCurrentVersion(), resolveLatestVersion()]);
+	if (!(current && latest && isNewer(latest, current))) {
+		return null;
+	}
+
+	const message = `oh-pi ${latest} available (current: ${current}). Run: npx @ifi/oh-pi@latest`;
+	deps.notify?.(message);
+	return message;
+}
+
 /**
  * Extension entry point — registers a `session_start` hook that performs a
  * deferred, non-blocking version check and notifies the user if an update is available.
@@ -99,25 +158,11 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_start", (_event, ctx) => {
 		// Non-blocking: run check in background after a short delay
 		setTimeout(() => {
-			try {
-				if (Date.now() - readStamp() < CHECK_INTERVAL) {
-					return;
-				}
-				writeStamp();
-
-				const current = getCurrentVersion();
-				const latest = getLatestVersion();
-				if (!(current && latest && isNewer(latest, current))) {
-					return;
-				}
-
-				const msg = `oh-pi ${latest} available (current: ${current}). Run: npx @ifi/oh-pi@latest`;
-				if (ctx.hasUI) {
-					ctx.ui.notify(msg, "info");
-				}
-			} catch {
+			runAutoUpdateCheck({
+				notify: ctx.hasUI ? (message) => ctx.ui.notify(message, "info") : undefined,
+			}).catch(() => {
 				// Version check is best-effort — never crash the session
-			}
+			});
 		}, 2000);
 	});
 }
