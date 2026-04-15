@@ -142,10 +142,15 @@ describe("ollama local downloads", () => {
 		const { default: ollamaProviderExtension } = await import("../index.js");
 		const harness = createExtensionHarness();
 		ollamaProviderExtension(harness.pi as never);
+		expect(execFileSyncMock).not.toHaveBeenCalled();
 
-		await harness.emitAsync("session_start", { type: "session_start" }, harness.ctx);
+		const sessionStart = harness.emitAsync("session_start", { type: "session_start" }, harness.ctx);
+		expect(execFileSyncMock).not.toHaveBeenCalled();
+		await sessionStart;
+
 		await waitFor(() => harness.notifications.some((item) => item.msg.includes("Only ollama-cloud models are available right now")));
 
+		expect(execFileSyncMock).toHaveBeenCalled();
 		expect(harness.notifications.some((item) => item.type === "warning")).toBe(true);
 		expect((harness.providers.get("ollama")?.models as Array<{ id: string }> | undefined) ?? []).toEqual([]);
 	});

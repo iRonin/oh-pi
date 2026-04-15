@@ -81,6 +81,7 @@ const cloudEnvDiscoveryState: RuntimeDiscoveryState = {
 
 const activeLocalPulls = new Map<string, Promise<boolean>>();
 const PULL_STATUS_KEY = "ollama.pull";
+const OLLAMA_STARTUP_CLI_REFRESH_DELAY_MS = 250;
 
 let ollamaCliStatus: OllamaCliStatus | null = null;
 let missingCliWarningShown = false;
@@ -234,10 +235,48 @@ function registerOllamaCommands(pi: ExtensionAPI): void {
 	});
 }
 
-function registerOllamaLifecycle(pi: ExtensionAPI): void {
+function registerOllamaLifecycle(pi: ExtensionAPI): { scheduleLocalBootstrapRefresh: (ctx?: CommandContextLike) => void } {
+	let startupCliRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+	let pendingLocalBootstrapRefresh: Promise<void> | null = null;
+	let pendingStartupContext: CommandContextLike | null = null;
+
+	const notifyMissingCli = (ctx: CommandContextLike | null) => {
+		if (!ctx?.hasUI || missingCliWarningShown || ollamaCliStatus?.available !== false) {
+			return;
+		}
+
+		missingCliWarningShown = true;
+		ctx.ui.notify(
+			"Ollama CLI not found. Only ollama-cloud models are available right now because Ollama is not installed.",
+			"warning",
+		);
+	};
+
+	const scheduleLocalBootstrapRefresh = (ctx?: CommandContextLike) => {
+		if (ctx) {
+			pendingStartupContext = ctx;
+		}
+		if (pendingLocalBootstrapRefresh || startupCliRefreshTimer) {
+			return;
+		}
+
+		startupCliRefreshTimer = setTimeout(() => {
+			startupCliRefreshTimer = null;
+			pendingLocalBootstrapRefresh = refreshRegisteredLocalModels(pi)
+				.then(() => {
+					pendingStartupContext?.modelRegistry.refresh?.();
+					notifyMissingCli(pendingStartupContext);
+				})
+				.finally(() => {
+					pendingLocalBootstrapRefresh = null;
+					pendingStartupContext = null;
+				});
+		}, OLLAMA_STARTUP_CLI_REFRESH_DELAY_MS);
+	};
+
 	pi.on("session_start", async (_event, ctx) => {
-		ollamaCliStatus = await getOllamaCliStatus();
-		registerOllamaLocalProvider(pi);
+		scheduleLocalBootstrapRefresh(ctx);
+		notifyMissingCli(ctx);
 
 		try {
 			const credential = getStoredCloudCredentialFromContext(ctx);
@@ -247,14 +286,14 @@ function registerOllamaLifecycle(pi: ExtensionAPI): void {
 			// Auth storage can be unavailable during early startup depending on initialization order.
 			// Keep boot resilient and rely on manual /ollama refresh-models as fallback.
 		}
+	});
 
-		if (!ollamaCliStatus.available && ctx.hasUI && !missingCliWarningShown) {
-			missingCliWarningShown = true;
-			ctx.ui.notify(
-				"Ollama CLI not found. Only ollama-cloud models are available right now because Ollama is not installed.",
-				"warning",
-			);
+	pi.on("session_shutdown", () => {
+		if (startupCliRefreshTimer) {
+			clearTimeout(startupCliRefreshTimer);
+			startupCliRefreshTimer = null;
 		}
+		pendingStartupContext = null;
 	});
 
 	pi.on("model_select", async (event, ctx) => {
@@ -302,6 +341,8 @@ function registerOllamaLifecycle(pi: ExtensionAPI): void {
 
 		await pullLocalModel(pi, ctx, event.model.id);
 	});
+
+	return { scheduleLocalBootstrapRefresh };
 }
 
 async function refreshCloudModels(pi: ExtensionAPI, ctx: CommandContextLike, credential: OllamaCloudCredentials | null): Promise<OllamaProviderModel[]> {
@@ -677,11 +718,11 @@ function createOllamaProcessEnv(): NodeJS.ProcessEnv {
 	return env;
 }
 
-function bootstrapOllamaProviders(pi: ExtensionAPI): void {
+function bootstrapOllamaProviders(pi: ExtensionAPI, scheduleLocalRefresh: () => void): void {
 	registerOllamaCloudProvider(pi);
 	registerOllamaLocalProvider(pi);
 	void refreshRegisteredCloudEnvModels(pi);
-	void refreshRegisteredLocalModels(pi);
+	scheduleLocalRefresh();
 }
 
 export {
@@ -696,7 +737,7 @@ export {
 export { toOllamaModel, toOllamaCloudModel, type OllamaCloudCredentials, type OllamaProviderModel } from "./models.js";
 
 export default function ollamaProviderExtension(pi: ExtensionAPI): void {
-	bootstrapOllamaProviders(pi);
+	const registerLifecycle = registerOllamaLifecycle(pi);
+	bootstrapOllamaProviders(pi, registerLifecycle.scheduleLocalBootstrapRefresh);
 	registerOllamaCommands(pi);
-	registerOllamaLifecycle(pi);
 }
