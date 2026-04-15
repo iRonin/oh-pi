@@ -31,6 +31,9 @@ export type PrInfo = {
 };
 
 const PR_PROBE_COOLDOWN_MS = 60_000;
+const FOOTER_STARTUP_REFRESH_DELAY_MS = 250;
+const FOOTER_STARTUP_DEFER_ENTRY_THRESHOLD = 250;
+const WORKTREE_REFRESH_COOLDOWN_MS = 30_000;
 
 export type FooterUsageTotals = {
 	input: number;
@@ -68,14 +71,20 @@ function accumulateAssistantUsage(totals: FooterUsageTotals, message: AssistantM
 	totals.cost += Number(message.usage.cost.total) || 0;
 }
 
-export function collectFooterUsageTotals(ctx: Pick<ExtensionContext, "sessionManager">): FooterUsageTotals {
+function collectFooterUsageTotalsFromEntries(
+	entries: ReturnType<ExtensionContext["sessionManager"]["getBranch"]>,
+): FooterUsageTotals {
 	const totals: FooterUsageTotals = { input: 0, output: 0, cost: 0 };
-	for (const entry of ctx.sessionManager.getBranch()) {
+	for (const entry of entries) {
 		if (entry.type === "message" && entry.message.role === "assistant") {
 			accumulateAssistantUsage(totals, entry.message as AssistantMessage);
 		}
 	}
 	return totals;
+}
+
+export function collectFooterUsageTotals(ctx: Pick<ExtensionContext, "sessionManager">): FooterUsageTotals {
+	return collectFooterUsageTotalsFromEntries(ctx.sessionManager.getBranch());
 }
 
 export default function (pi: ExtensionAPI) {
@@ -89,6 +98,9 @@ export default function (pi: ExtensionAPI) {
 	let cachedPrs: PrInfo[] = [];
 	let cachedWorktreeSnapshot: RepoWorktreeSnapshot | null = null;
 	let lastWorktreeRefreshAt = 0;
+	let startupRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+	let worktreeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+	let requestFooterRender: (() => void) | null = null;
 	/** Branch name when the PR was last probed. */
 	let prProbedForBranch: string | null = null;
 	/** Last time a PR probe was attempted. */
@@ -96,18 +108,72 @@ export default function (pi: ExtensionAPI) {
 	/** Whether a PR probe is in flight. */
 	let prProbeInFlight = false;
 
-	const syncUsageTotals = (ctx: Pick<ExtensionContext, "sessionManager">) => {
-		usageTotals = collectFooterUsageTotals(ctx);
+	const syncUsageTotalsFromEntries = (entries: ReturnType<ExtensionContext["sessionManager"]["getBranch"]>) => {
+		usageTotals = collectFooterUsageTotalsFromEntries(entries);
+	};
+
+	const clearStartupRefreshTimer = () => {
+		if (!startupRefreshTimer) {
+			return;
+		}
+		clearTimeout(startupRefreshTimer);
+		startupRefreshTimer = null;
+	};
+
+	const scheduleUsageTotalsRefresh = (ctx: Pick<ExtensionContext, "sessionManager">) => {
+		clearStartupRefreshTimer();
+		const entries = ctx.sessionManager.getBranch();
+		const refresh = () => {
+			syncUsageTotalsFromEntries(entries);
+			requestFooterRender?.();
+		};
+
+		if (entries.length < FOOTER_STARTUP_DEFER_ENTRY_THRESHOLD) {
+			refresh();
+			return;
+		}
+
+		startupRefreshTimer = setTimeout(() => {
+			startupRefreshTimer = null;
+			refresh();
+		}, FOOTER_STARTUP_REFRESH_DELAY_MS);
 	};
 
 	const syncWorktreeSnapshot = (cwd = process.cwd()) => {
 		cachedWorktreeSnapshot = getRepoWorktreeSnapshot(cwd);
 		lastWorktreeRefreshAt = Date.now();
+		requestFooterRender?.();
+	};
+
+	const clearWorktreeRefreshTimer = () => {
+		if (!worktreeRefreshTimer) {
+			return;
+		}
+		clearTimeout(worktreeRefreshTimer);
+		worktreeRefreshTimer = null;
+	};
+
+	const scheduleWorktreeSnapshotRefresh = (
+		cwd = process.cwd(),
+		options: { delayMs?: number; force?: boolean } = {},
+	) => {
+		const delayMs = Math.max(0, options.delayMs ?? 0);
+		if (!options.force && Date.now() - lastWorktreeRefreshAt < WORKTREE_REFRESH_COOLDOWN_MS) {
+			return;
+		}
+		if (worktreeRefreshTimer) {
+			return;
+		}
+
+		worktreeRefreshTimer = setTimeout(() => {
+			worktreeRefreshTimer = null;
+			syncWorktreeSnapshot(cwd);
+		}, delayMs);
 	};
 
 	const getWorktreeSnapshot = () => {
-		if (Date.now() - lastWorktreeRefreshAt > 30_000) {
-			syncWorktreeSnapshot();
+		if (Date.now() - lastWorktreeRefreshAt > WORKTREE_REFRESH_COOLDOWN_MS) {
+			scheduleWorktreeSnapshotRefresh(activeCtx?.cwd ?? process.cwd());
 		}
 		return cachedWorktreeSnapshot;
 	};
@@ -151,18 +217,19 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("session_start", async (_event, ctx) => {
 		sessionStart = Date.now();
-		syncUsageTotals(ctx);
-		syncWorktreeSnapshot(ctx.cwd);
 		activeCtx = ctx;
+		scheduleUsageTotalsRefresh(ctx);
+		scheduleWorktreeSnapshotRefresh(ctx.cwd, { delayMs: FOOTER_STARTUP_REFRESH_DELAY_MS, force: true });
 
 		ctx.ui.setFooter((tui, theme, footerData) => {
 			activeFooterData = footerData;
-			const probeActivePrs = () => {
-				syncWorktreeSnapshot(ctx.cwd);
-				probePrs(getWorktreeSnapshot()?.current?.branch ?? footerData.getGitBranch());
+			requestFooterRender = () => tui.requestRender();
+			const probeActivePrs = (force = false) => {
+				scheduleWorktreeSnapshotRefresh(ctx.cwd, { force });
+				probePrs(cachedWorktreeSnapshot?.current?.branch ?? footerData.getGitBranch());
 			};
 			const unsub = footerData.onBranchChange(() => {
-				probeActivePrs();
+				probeActivePrs(true);
 				tui.requestRender();
 			});
 			const unsubSafeMode = subscribeSafeMode(() => tui.requestRender());
@@ -170,10 +237,11 @@ export default function (pi: ExtensionAPI) {
 				probeActivePrs();
 				tui.requestRender();
 			}, 30000);
-			probeActivePrs();
+			probeActivePrs(true);
 
 			return {
 				dispose() {
+					requestFooterRender = null;
 					unsub();
 					unsubSafeMode();
 					clearInterval(timer);
@@ -244,25 +312,34 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("session_switch", (event, ctx) => {
-		syncUsageTotals(ctx);
-		syncWorktreeSnapshot(ctx.cwd);
+		activeCtx = ctx;
+		scheduleUsageTotalsRefresh(ctx);
+		scheduleWorktreeSnapshotRefresh(ctx.cwd, { delayMs: FOOTER_STARTUP_REFRESH_DELAY_MS, force: true });
 		if (event.reason === "new") {
 			sessionStart = Date.now();
 		}
 	});
 
 	pi.on("session_tree", (_event, ctx) => {
-		syncUsageTotals(ctx);
+		activeCtx = ctx;
+		scheduleUsageTotalsRefresh(ctx);
 	});
 
 	pi.on("session_fork", (_event, ctx) => {
-		syncUsageTotals(ctx);
+		activeCtx = ctx;
+		scheduleUsageTotalsRefresh(ctx);
 	});
 
 	pi.on("turn_end", (event) => {
 		if (event.message.role === "assistant") {
 			accumulateAssistantUsage(usageTotals, event.message as AssistantMessage);
 		}
+	});
+
+	pi.on("session_shutdown", () => {
+		clearStartupRefreshTimer();
+		clearWorktreeRefreshTimer();
+		requestFooterRender = null;
 	});
 
 	// ─── /status overlay ─────────────────────────────────────────────────
@@ -379,6 +456,7 @@ export default function (pi: ExtensionAPI) {
 		description: "Show a full status overview: model, session, context, workspace, PR, and extension statuses",
 		async handler(_args, ctx) {
 			activeCtx = ctx;
+			syncWorktreeSnapshot(ctx.cwd);
 			await ctx.ui.custom(
 				(_tui, theme, _keybindings, done) => {
 					const lines = buildStatusLines(theme);

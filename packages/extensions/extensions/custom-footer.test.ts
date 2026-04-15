@@ -10,6 +10,7 @@ vi.mock("@mariozechner/pi-tui", () => ({
 
 import customFooter, { collectFooterUsageTotals, fmt, formatElapsed, hyperlink } from "./custom-footer";
 import { resetSafeModeStateForTests, setSafeModeState } from "./runtime-mode";
+import * as worktreeShared from "./worktree-shared";
 
 function makeAssistantMessage(overrides: Partial<{ input: number; output: number; cost: number }> = {}) {
 	return {
@@ -133,6 +134,87 @@ describe("custom-footer extension", () => {
 		expect(secondRender).toContain("1.7k/900");
 		expect(secondRender).toContain("$0.07");
 		expect(getBranch).toHaveBeenCalledTimes(1);
+	});
+
+	it("defers expensive startup aggregation for large sessions", async () => {
+		vi.useFakeTimers();
+		try {
+			const pi = createMockPi();
+			customFooter(pi as any);
+
+			const branch = Array.from({ length: 300 }, () => ({
+				type: "message",
+				message: makeAssistantMessage({ input: 10, output: 5, cost: 0.01 }),
+			}));
+			const getBranch = vi.fn(() => branch);
+
+			let footerFactory: any;
+			const ctx = {
+				model: { id: "claude-sonnet", provider: "anthropic" },
+				getContextUsage: () => ({ percent: 48 }),
+				sessionManager: { getBranch },
+				ui: {
+					setFooter(factory: any) {
+						footerFactory = factory;
+					},
+				},
+			};
+
+			await pi._emit("session_start", {}, ctx);
+			expect(getBranch).toHaveBeenCalledTimes(1);
+
+			const component = footerFactory(
+				{ requestRender: vi.fn() },
+				{ fg: (_color: string, text: string) => text },
+				{ onBranchChange: () => () => undefined, getGitBranch: () => "main" },
+			);
+
+			expect(component.render(200)[0]).toContain("$0.00");
+
+			await vi.advanceTimersByTimeAsync(500);
+
+			expect(component.render(200)[0]).toContain("$3.00");
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("defers worktree snapshot refresh until after startup", async () => {
+		vi.useFakeTimers();
+		const getRepoWorktreeSnapshot = vi.spyOn(worktreeShared, "getRepoWorktreeSnapshot").mockReturnValue(null as never);
+		try {
+			const pi = createMockPi();
+			customFooter(pi as any);
+
+			let footerFactory: any;
+			const ctx = {
+				cwd: "/tmp/project",
+				model: { id: "claude-sonnet", provider: "anthropic" },
+				getContextUsage: () => ({ percent: 12 }),
+				sessionManager: { getBranch: () => [] },
+				ui: {
+					setFooter(factory: any) {
+						footerFactory = factory;
+					},
+				},
+			};
+
+			await pi._emit("session_start", {}, ctx);
+			expect(getRepoWorktreeSnapshot).not.toHaveBeenCalled();
+
+			footerFactory(
+				{ requestRender: vi.fn() },
+				{ fg: (_color: string, text: string) => text },
+				{ onBranchChange: () => () => undefined, getGitBranch: () => "main" },
+			);
+			expect(getRepoWorktreeSnapshot).not.toHaveBeenCalled();
+
+			await vi.advanceTimersByTimeAsync(500);
+			expect(getRepoWorktreeSnapshot).toHaveBeenCalled();
+		} finally {
+			getRepoWorktreeSnapshot.mockRestore();
+			vi.useRealTimers();
+		}
 	});
 
 	it("does not rescan branch during repeated renders for long sessions", async () => {
