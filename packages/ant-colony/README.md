@@ -47,8 +47,10 @@ Shared storage layout:
 
 ```text
 ~/.pi/agent/ant-colony/root/<mirrored-workspace-path>/
-├── colonies/
-└── worktrees/
+└── colonies/
+
+~/.pi/agent/worktrees/root/<mirrored-repo-root>/worktrees/
+└── ant-colony-...
 ```
 
 <!-- {=antColonyPrepareColonyWorkspaceDocs} -->

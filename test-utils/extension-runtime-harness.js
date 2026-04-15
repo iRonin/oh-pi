@@ -58,6 +58,7 @@ export function createExtensionHarness() {
 			userMessages.push(message);
 		},
 		appendEntry() {},
+		exec: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
 		async setModel(model) {
 			ctx.model = model;
 			return true;
