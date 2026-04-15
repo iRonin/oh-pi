@@ -86,7 +86,11 @@ interface BackgroundColony {
 }
 
 export default function antColonyExtension(pi: ExtensionAPI) {
-	const storageOptions = resolveColonyStorageOptions();
+	let storageOptions: ReturnType<typeof resolveColonyStorageOptions> | null = null;
+	const getStorageOptions = () => {
+		storageOptions ??= resolveColonyStorageOptions();
+		return storageOptions;
+	};
 	/** All running background colonies, keyed by short ID. */
 	const colonies = new Map<string, BackgroundColony>();
 	/** Auto-incrementing colony counter for generating IDs. */
@@ -345,6 +349,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 		},
 		signal?: AbortSignal | null,
 	) {
+		const storageOptions = getStorageOptions();
 		if (shouldManageProjectGitignore(storageOptions)) {
 			ensureGitignore(params.cwd);
 		}
@@ -410,6 +415,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 		},
 		options?: { resume?: boolean; stableIdHint?: string; workspaceHint?: ColonyWorkspace | null },
 	): { id: string; workspace: ColonyWorkspace } {
+		const storageOptions = getStorageOptions();
 		const resume = options?.resume ?? false;
 		const colonyId = nextColonyId();
 		const abortController = new AbortController();
@@ -1415,7 +1421,7 @@ export default function antColonyExtension(pi: ExtensionAPI) {
 	pi.registerCommand("colony-resume", {
 		description: "Resume colonies from their last checkpoint (resumes all resumable by default)",
 		async handler(args, ctx) {
-			const all = Nest.findAllResumable(ctx.cwd, storageOptions);
+			const all = Nest.findAllResumable(ctx.cwd, getStorageOptions());
 			if (all.length === 0) {
 				ctx.ui.notify("No resumable colonies found.", "info");
 				return;

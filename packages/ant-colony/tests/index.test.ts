@@ -92,11 +92,31 @@ const runColonyMock = queenMocks.runColonyMock;
 const resumeColonyMock = queenMocks.resumeColonyMock;
 const createUsageLimitsTrackerMock = queenMocks.createUsageLimitsTrackerMock;
 
+const storageMocks = vi.hoisted(() => ({
+	resolveColonyStorageOptionsMock: vi.fn(),
+	shouldManageProjectGitignoreMock: vi.fn(),
+}));
+
 vi.mock("../extensions/ant-colony/queen.js", () => ({
 	runColony: queenMocks.runColonyMock,
 	resumeColony: queenMocks.resumeColonyMock,
 	createUsageLimitsTracker: queenMocks.createUsageLimitsTrackerMock,
 }));
+
+vi.mock("../extensions/ant-colony/storage.js", async (importActual) => {
+	const actual = await importActual<typeof import("../extensions/ant-colony/storage.js")>();
+	storageMocks.resolveColonyStorageOptionsMock.mockImplementation((options?: any) =>
+		actual.resolveColonyStorageOptions(options),
+	);
+	storageMocks.shouldManageProjectGitignoreMock.mockImplementation((options?: any) =>
+		actual.shouldManageProjectGitignore(options),
+	);
+	return {
+		...actual,
+		resolveColonyStorageOptions: storageMocks.resolveColonyStorageOptionsMock,
+		shouldManageProjectGitignore: storageMocks.shouldManageProjectGitignoreMock,
+	};
+});
 
 vi.mock("../extensions/ant-colony/worktree.js", async (importActual) => {
 	const actual = await importActual<typeof import("../extensions/ant-colony/worktree.js")>();
@@ -385,11 +405,20 @@ describe("index-level telemetry propagation", () => {
 	let restoreStorageEnv: (() => void) | undefined;
 
 	beforeEach(() => {
+		storageMocks.resolveColonyStorageOptionsMock.mockClear();
+		storageMocks.shouldManageProjectGitignoreMock.mockClear();
 		restoreStorageEnv = withSharedStorageEnv();
 	});
 
 	afterEach(() => {
 		restoreStorageEnv?.();
+	});
+
+	it("does not resolve colony storage options during extension registration", () => {
+		const pi = createMockPi();
+		antColonyExtension(pi as any);
+
+		expect(storageMocks.resolveColonyStorageOptionsMock).not.toHaveBeenCalled();
 	});
 
 	it("passes eventBus into ant_colony runtime tool execution", async () => {
@@ -409,6 +438,7 @@ describe("index-level telemetry propagation", () => {
 
 		const executePromise = antColonyTool.execute("id", { goal: "test telemetry" }, undefined, undefined, ctx);
 
+		expect(storageMocks.resolveColonyStorageOptionsMock).toHaveBeenCalledTimes(1);
 		expect(runInvocations).toHaveLength(1);
 		expect(runInvocations[0].opts.eventBus).toBe(pi.events);
 
