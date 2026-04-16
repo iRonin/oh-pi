@@ -1647,6 +1647,8 @@ describe("schedulerExtension registration", () => {
 		expect(pi._commands.has("loop")).toBe(true);
 		expect(pi._commands.has("remind")).toBe(true);
 		expect(pi._commands.has("schedule")).toBe(true);
+		expect(pi._commands.has("schedule:tui")).toBe(true);
+		expect(pi._commands.has("schedule:delete")).toBe(true);
 		expect(pi._commands.has("unschedule")).toBe(true);
 	});
 
@@ -2783,6 +2785,11 @@ describe("edge cases", () => {
 	it("handles /schedule with no args (TUI manager)", async () => {
 		await pi._commands.get("schedule").handler("", ctx);
 		expect(ctx._notifications.some((n: any) => n.msg.includes("No scheduled tasks"))).toBe(true);
+	});
+
+	it("shows colon-style guidance for unsupported scope changes", async () => {
+		await pi._commands.get("schedule").handler("scope", ctx);
+		expect(ctx._notifications.at(-1)?.msg).toContain("/schedule:scope is not supported yet");
 	});
 
 	it("shows workspace, creator, and full prompt after selecting a task", async () => {

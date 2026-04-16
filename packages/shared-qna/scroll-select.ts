@@ -81,6 +81,8 @@ type ScrollSelectTheme = {
 };
 
 class ScrollSelectComponent<T> {
+	focused = false;
+
 	private readonly tui: { requestRender: () => void };
 	private readonly theme: ScrollSelectTheme;
 	private readonly done: (value: T | null) => void;
@@ -203,6 +205,8 @@ class ScrollSelectComponent<T> {
 			void this.promptSearch();
 		}
 	}
+
+	invalidate(): void {}
 
 	dispose(): void {}
 

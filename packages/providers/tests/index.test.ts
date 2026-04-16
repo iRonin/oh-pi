@@ -141,8 +141,9 @@ describe("provider catalog extension", () => {
 		harness.ctx.ui.input = vi.fn(async () => "provider-api-key") as never;
 
 		providerCatalogExtension(harness.pi as never);
-		const command = harness.commands.get("providers");
-		await command.handler("login", harness.ctx);
+		expect(harness.commands.has("providers:login")).toBe(true);
+		const command = harness.commands.get("providers:login");
+		await command.handler("", harness.ctx);
 
 		expect(harness.ctx.ui.select).not.toHaveBeenCalled();
 		expect(harness.ctx.ui.custom).toHaveBeenCalledWith(expect.any(Function), {
@@ -221,8 +222,57 @@ describe("provider catalog extension", () => {
 
 		await command.handler("refresh-models missing-provider", harness.ctx);
 		expect(harness.notifications.at(-1)).toEqual({
-			msg: 'No provider matched "missing-provider". Run /providers list first.',
+			msg: 'No provider matched "missing-provider". Run /providers:list first.',
 			type: "warning",
 		});
+	});
+
+	it("shows colon-style usage and status hints for alias commands", async () => {
+		const harness = createExtensionHarness();
+		harness.ctx.modelRegistry = {
+			authStorage: {
+				get: vi.fn(() => undefined),
+				set: vi.fn(),
+			},
+			refresh: vi.fn(),
+		} as never;
+		providerCatalogExtension(harness.pi as never);
+
+		await harness.commands.get("providers:info")?.handler?.("", harness.ctx as never);
+		expect(harness.notifications.at(-1)?.msg).toContain("Usage: /providers:info <provider>");
+
+		await harness.commands.get("providers:info")?.handler?.("does-not-exist", harness.ctx as never);
+		expect(harness.notifications.at(-1)?.msg).toContain('No provider matched "does-not-exist".');
+
+		await harness.commands.get("providers:models")?.handler?.("", harness.ctx as never);
+		expect(harness.notifications.at(-1)?.msg).toContain("Usage: /providers:models <provider>");
+
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(() => {
+				throw new Error("catalog unavailable");
+			}) as never,
+		);
+		await harness.commands.get("providers:models")?.handler?.("openai", harness.ctx as never);
+		expect(harness.notifications.at(-1)?.msg).toContain("/providers:refresh-models openai");
+
+		await harness.commands.get("providers:models")?.handler?.("does-not-exist", harness.ctx as never);
+		expect(harness.notifications.at(-1)?.msg).toContain('No provider matched "does-not-exist".');
+
+		await harness.commands.get("providers:login")?.handler?.("does-not-exist", harness.ctx as never);
+		expect(harness.notifications.at(-1)?.msg).toContain("Run /providers:list first.");
+
+		await harness.commands.get("providers:refresh-models")?.handler?.("does-not-exist", harness.ctx as never);
+		expect(harness.notifications.at(-1)?.msg).toContain("Run /providers:list first.");
+
+		await harness.commands.get("providers:status")?.handler?.("", harness.ctx as never);
+		expect(harness.notifications.at(-1)?.msg).toContain("/providers:login");
+		expect(harness.notifications.at(-1)?.msg).toContain("/providers:refresh-models");
+
+		for (const provider of SUPPORTED_PROVIDERS) {
+			process.env[provider.env[0] ?? `${provider.id.toUpperCase()}_API_KEY`] = "configured";
+		}
+		await harness.commands.get("providers:status")?.handler?.("", harness.ctx as never);
+		expect(harness.notifications.at(-1)?.msg).toContain("…and");
 	});
 });

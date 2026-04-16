@@ -64,11 +64,11 @@ function registerProvider(pi: ExtensionAPI, provider: SupportedProviderDefinitio
 }
 
 function registerProvidersCommand(pi: ExtensionAPI): void {
-	pi.registerCommand("providers", {
+	const providersCommand = {
 		description:
-			"Inspect, log in to, or refresh the OpenCode-backed multi-provider catalog: /providers [status|list [query]|info <provider>|models <provider>|login [provider]|refresh-models [provider|all]]",
+			"Inspect, log in to, or refresh the OpenCode-backed multi-provider catalog: /providers, /providers:status, /providers:list [query], /providers:info <provider>, /providers:models <provider>, /providers:login [provider], /providers:refresh-models [provider|all]",
 		// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This explicit command router keeps each provider subcommand readable.
-		async handler(args, ctx) {
+		async handler(args: string, ctx: ExtensionCommandContext) {
 			const trimmed = args.trim();
 			const [rawAction = "status", ...rest] = trimmed ? trimmed.split(/\s+/) : ["status"];
 			const action = rawAction.toLowerCase();
@@ -86,7 +86,7 @@ function registerProvidersCommand(pi: ExtensionAPI): void {
 			if (action === "refresh-models") {
 				const providers = query && query.toLowerCase() !== "all" ? findProviders(query) : SUPPORTED_PROVIDERS;
 				if (providers.length === 0) {
-					ctx.ui.notify(`No provider matched "${query}". Run /providers list first.`, "warning");
+					ctx.ui.notify(`No provider matched "${query}". Run /providers:list first.`, "warning");
 					return;
 				}
 				const refreshed = await refreshProviders(pi, ctx, providers);
@@ -102,12 +102,12 @@ function registerProvidersCommand(pi: ExtensionAPI): void {
 
 			if (action === "info") {
 				if (!query) {
-					ctx.ui.notify("Usage: /providers info <provider>", "warning");
+					ctx.ui.notify("Usage: /providers:info <provider>", "warning");
 					return;
 				}
 				const provider = findProviders(query)[0];
 				if (!provider) {
-					ctx.ui.notify(`No provider matched "${query}". Run /providers list first.`, "warning");
+					ctx.ui.notify(`No provider matched "${query}". Run /providers:list first.`, "warning");
 					return;
 				}
 				ctx.ui.notify(await renderProviderInfo(provider, ctx), "info");
@@ -116,12 +116,12 @@ function registerProvidersCommand(pi: ExtensionAPI): void {
 
 			if (action === "models") {
 				if (!query) {
-					ctx.ui.notify("Usage: /providers models <provider>", "warning");
+					ctx.ui.notify("Usage: /providers:models <provider>", "warning");
 					return;
 				}
 				const provider = findProviders(query)[0];
 				if (!provider) {
-					ctx.ui.notify(`No provider matched "${query}". Run /providers list first.`, "warning");
+					ctx.ui.notify(`No provider matched "${query}". Run /providers:list first.`, "warning");
 					return;
 				}
 				ctx.ui.notify(await renderProviderModels(provider, ctx), "info");
@@ -130,7 +130,42 @@ function registerProvidersCommand(pi: ExtensionAPI): void {
 
 			ctx.ui.notify(renderStatus(ctx), "info");
 		},
-	});
+	};
+
+	pi.registerCommand("providers", providersCommand);
+
+	const aliases: Array<{ name: string; subcommand: string; description: string }> = [
+		{ name: "providers:status", subcommand: "status", description: "Show multi-provider catalog status." },
+		{ name: "providers:list", subcommand: "list", description: "List supported providers and environment variables." },
+		{
+			name: "providers:login",
+			subcommand: "login",
+			description: "Open the provider picker and log in with an API key.",
+		},
+		{
+			name: "providers:info",
+			subcommand: "info",
+			description: "Inspect one provider's API mode, URLs, env vars, and model count.",
+		},
+		{
+			name: "providers:models",
+			subcommand: "models",
+			description: "List the current or fallback model catalog for one provider.",
+		},
+		{
+			name: "providers:refresh-models",
+			subcommand: "refresh-models",
+			description: "Refresh configured providers from live discovery when possible.",
+		},
+	];
+
+	for (const alias of aliases) {
+		pi.registerCommand(alias.name, {
+			description: alias.description,
+			handler: (args: string, ctx: ExtensionCommandContext) =>
+				providersCommand.handler(args ? `${alias.subcommand} ${args}` : alias.subcommand, ctx),
+		});
+	}
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Refresh handling branches clearly by stored credential vs env configuration paths.
@@ -218,7 +253,7 @@ function renderStatus(ctx: ProviderStatusContext): string {
 
 	if (configured.length === 0) {
 		lines.push("No provider from this package is configured yet.");
-		lines.push("Tip: run /providers login to open the paged provider picker, then use /providers refresh-models.");
+		lines.push("Tip: run /providers:login to open the paged provider picker, then use /providers:refresh-models.");
 		return lines.join("\n");
 	}
 
@@ -234,7 +269,7 @@ function renderStatus(ctx: ProviderStatusContext): string {
 	}
 
 	if (configured.length > 20) {
-		lines.push(`…and ${configured.length - 20} more. Run /providers list to inspect everything.`);
+		lines.push(`…and ${configured.length - 20} more. Run /providers:list to inspect everything.`);
 	}
 
 	return lines.join("\n");
@@ -279,7 +314,7 @@ async function renderProviderModels(
 	const currentModels = credential ? getCredentialModels(credential) : (runtimeState.models.get(provider.id) ?? []);
 	const models = currentModels.length > 0 ? currentModels : await getCatalogModels(provider).catch(() => []);
 	if (models.length === 0) {
-		return `${provider.id} has no discovered models yet. Configure it, then run /providers refresh-models ${provider.id}.`;
+		return `${provider.id} has no discovered models yet. Configure it, then run /providers:refresh-models ${provider.id}.`;
 	}
 
 	return [
@@ -355,7 +390,7 @@ async function resolveProviderSelection(
 ): Promise<SupportedProviderDefinition | null> {
 	const matchedProviders = query ? findProviders(query) : SUPPORTED_PROVIDERS;
 	if (matchedProviders.length === 0) {
-		ctx.ui.notify(`No provider matched "${query}". Run /providers list first.`, "warning");
+		ctx.ui.notify(`No provider matched "${query}". Run /providers:list first.`, "warning");
 		return null;
 	}
 

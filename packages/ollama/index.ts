@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 import {
 	type AssistantMessageEventStream,
 	type Context,
@@ -149,9 +149,9 @@ async function refreshRegisteredCloudEnvModels(pi: ExtensionAPI): Promise<Ollama
 }
 
 function registerOllamaCommands(pi: ExtensionAPI): void {
-	pi.registerCommand("ollama", {
-		description: "Inspect or refresh local + cloud Ollama providers: /ollama [status|refresh-models|models|info <model>|pull <model>]",
-		async handler(args, ctx) {
+	const ollamaCommand = {
+		description: "Inspect or refresh local + cloud Ollama providers: /ollama, /ollama:status, /ollama:refresh-models, /ollama:models, /ollama:info <model>, /ollama:pull <model>",
+		async handler(args: string, ctx: ExtensionCommandContext) {
 			const trimmed = args.trim();
 			const [rawAction = "status", ...rest] = trimmed ? trimmed.split(/\s+/) : ["status"];
 			const action = rawAction.toLowerCase();
@@ -177,13 +177,13 @@ function registerOllamaCommands(pi: ExtensionAPI): void {
 			if (action === "pull" || action === "download") {
 				const query = rest.join(" ").trim();
 				if (!query) {
-					ctx.ui.notify("Usage: /ollama pull <model>", "warning");
+					ctx.ui.notify("Usage: /ollama:pull <model>", "warning");
 					return;
 				}
 
 				const localModel = findLocalModelForQuery(query, credential);
 				if (!localModel) {
-					ctx.ui.notify(`No Ollama model matched \"${query}\". Run /ollama refresh-models first.`, "warning");
+					ctx.ui.notify(`No Ollama model matched \"${query}\". Run /ollama:refresh-models first.`, "warning");
 					return;
 				}
 
@@ -199,12 +199,12 @@ function registerOllamaCommands(pi: ExtensionAPI): void {
 			if (action === "info") {
 				const query = rest.join(" ").trim();
 				if (!query) {
-					ctx.ui.notify("Usage: /ollama info <model>", "warning");
+					ctx.ui.notify("Usage: /ollama:info <model>", "warning");
 					return;
 				}
 				const model = findModelForQuery(query, collectOllamaModels(credential));
 				if (!model) {
-					ctx.ui.notify(`No Ollama model matched \"${query}\". Run /ollama refresh-models first.`, "warning");
+					ctx.ui.notify(`No Ollama model matched \"${query}\". Run /ollama:refresh-models first.`, "warning");
 					return;
 				}
 				ctx.ui.notify(renderModelInfo(model), "info");
@@ -213,11 +213,29 @@ function registerOllamaCommands(pi: ExtensionAPI): void {
 
 			ctx.ui.notify(renderUnifiedStatus(credential), "info");
 		},
-	});
+	};
+
+	pi.registerCommand("ollama", ollamaCommand);
+
+	const ollamaAliases: Array<{ name: string; subcommand: string; description: string }> = [
+		{ name: "ollama:status", subcommand: "status", description: "Show local and cloud Ollama status." },
+		{ name: "ollama:refresh-models", subcommand: "refresh-models", description: "Refresh local and cloud Ollama models." },
+		{ name: "ollama:models", subcommand: "models", description: "List local and cloud Ollama models." },
+		{ name: "ollama:info", subcommand: "info", description: "Show detailed metadata for one Ollama model." },
+		{ name: "ollama:pull", subcommand: "pull", description: "Download a local Ollama model via the CLI." },
+	];
+
+	for (const alias of ollamaAliases) {
+		pi.registerCommand(alias.name, {
+			description: alias.description,
+			handler: (args: string, ctx: ExtensionCommandContext) =>
+				ollamaCommand.handler(args ? `${alias.subcommand} ${args}` : alias.subcommand, ctx),
+		});
+	}
 
 	pi.registerCommand("ollama-cloud", {
 		description: "Backward-compatible alias for cloud-only Ollama status and refresh: /ollama-cloud [status|refresh-models]",
-		async handler(args, ctx) {
+		async handler(args: string, ctx: ExtensionCommandContext) {
 			const action = args.trim().toLowerCase() || "status";
 			const credential = getStoredCloudCredential(ctx);
 
@@ -478,7 +496,7 @@ function streamSimpleOllamaLocal(model: Model<any>, context: Context, options?: 
 			throw new Error("Ollama CLI is not installed. Only ollama-cloud models are available right now.");
 		}
 		throw new Error(
-			`ollama/${model.id} is not installed locally yet. Select it again to download it, or run /ollama pull ${model.id}.`,
+			`ollama/${model.id} is not installed locally yet. Select it again to download it, or run /ollama:pull ${model.id}.`,
 		);
 	}
 

@@ -270,10 +270,10 @@ export default function adaptiveRoutingExtension(pi: ExtensionAPI) {
 		updateStatus(ctx);
 	});
 
-	pi.registerCommand("route", {
+	const routeCommand = {
 		description:
-			"Adaptive routing controls: /route [status|on|off|shadow|auto|explain|assignments|lock|unlock|refresh|feedback|stats]",
-		async handler(args, ctx) {
+			"Adaptive routing controls: /route:status|on|auto|off|shadow|explain|assignments|lock|unlock|refresh|feedback|stats",
+		async handler(args: string, ctx: ExtensionCommandContext) {
 			const command = args.trim();
 			const [head, ...rest] = command.split(/\s+/).filter(Boolean);
 			const subcommand = (head ?? "status").toLowerCase();
@@ -333,7 +333,7 @@ export default function adaptiveRoutingExtension(pi: ExtensionAPI) {
 					const category = normalizeFeedbackCategory(rest[0]);
 					if (!category) {
 						ctx.ui.notify(
-							"Usage: /route feedback <good|bad|wrong-intent|overkill|underpowered|wrong-provider|wrong-thinking>",
+							"Usage: /route:feedback <good|bad|wrong-intent|overkill|underpowered|wrong-provider|wrong-thinking>",
 							"warning",
 						);
 						return;
@@ -358,7 +358,32 @@ export default function adaptiveRoutingExtension(pi: ExtensionAPI) {
 					ctx.ui.notify(buildStatusLine(runtime.state, runtime.lastDecision, getEffectiveMode()), "info");
 			}
 		},
-	});
+	};
+
+	pi.registerCommand("route", routeCommand);
+
+	const routeAliases: Array<{ name: string; subcommand: string; description: string }> = [
+		{ name: "route:status", subcommand: "status", description: "Show the current adaptive routing status." },
+		{ name: "route:on", subcommand: "on", description: "Enable adaptive routing auto mode." },
+		{ name: "route:auto", subcommand: "auto", description: "Enable adaptive routing auto mode." },
+		{ name: "route:off", subcommand: "off", description: "Disable adaptive routing." },
+		{ name: "route:shadow", subcommand: "shadow", description: "Suggest route decisions without changing the active model." },
+		{ name: "route:explain", subcommand: "explain", description: "Explain the latest adaptive route decision." },
+		{ name: "route:assignments", subcommand: "assignments", description: "Show delegated routing assignments." },
+		{ name: "route:lock", subcommand: "lock", description: "Lock routing to the current model and thinking level." },
+		{ name: "route:unlock", subcommand: "unlock", description: "Clear the adaptive routing lock." },
+		{ name: "route:refresh", subcommand: "refresh", description: "Refresh routing config and usage snapshots." },
+		{ name: "route:feedback", subcommand: "feedback", description: "Record feedback for the last adaptive routing decision." },
+		{ name: "route:stats", subcommand: "stats", description: "Show adaptive routing telemetry stats." },
+	];
+
+	for (const alias of routeAliases) {
+		pi.registerCommand(alias.name, {
+			description: alias.description,
+			handler: (args: string, ctx: ExtensionCommandContext) =>
+				routeCommand.handler(args ? `${alias.subcommand} ${args}` : alias.subcommand, ctx),
+		});
+	}
 }
 
 async function applyDecision(
