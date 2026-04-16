@@ -1,8 +1,10 @@
 import { execSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { type OhPConfig, resolvePiAgentDir } from "@ifi/oh-pi-core";
+import { resolvePiAgentDir } from "@ifi/oh-pi-core";
+import type { OhPConfigWithRouting } from "../types.js";
 import {
+	writeAdaptiveRoutingConfig,
 	writeAgents,
 	writeExtensions,
 	writeKeybindings,
@@ -85,7 +87,7 @@ function copyDir(src: string, dest: string) {
 /**
  * Apply an OhPConfig by generating and writing all config files to pi's resolved agent dir.
  */
-export function applyConfig(config: OhPConfig) {
+export function applyConfig(config: OhPConfigWithRouting) {
 	const agentDir = resolvePiAgentDir();
 	ensureDir(agentDir);
 	if ((config.providerStrategy ?? "replace") === "replace") {
@@ -97,6 +99,7 @@ export function applyConfig(config: OhPConfig) {
 	writeKeybindings(agentDir, config);
 	writeAgents(agentDir, config);
 	writeExtensions(agentDir, config);
+	writeAdaptiveRoutingConfig(agentDir, config);
 	writePrompts(agentDir, config);
 	writeSkills(agentDir, config);
 	writeTheme(agentDir, config);
