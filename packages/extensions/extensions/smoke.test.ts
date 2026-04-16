@@ -4,7 +4,6 @@ import adaptiveRoutingExtension from "./adaptive-routing.js";
 import autoUpdateExtension from "./auto-update.js";
 import btwExtension from "./btw.js";
 import externalEditorExtension from "./external-editor.js";
-import safeGuardExtension from "./safe-guard.js";
 import schedulerExtension from "./scheduler.js";
 import toolMetadataExtension from "./tool-metadata.js";
 import usageTrackerExtension from "./usage-tracker.js";
@@ -108,14 +107,4 @@ describe("extensions runtime smoke tests", () => {
 		expect(harness.commands.has("worktree")).toBe(true);
 	});
 
-	it("blocks protected writes in headless mode via safe-guard", async () => {
-		const harness = createExtensionHarness();
-		safeGuardExtension(harness.pi as never);
-		const results = await harness.emitAsync(
-			"tool_call",
-			{ toolName: "write", input: { path: ".env.local" } },
-			{ ...harness.ctx, hasUI: false },
-		);
-		expect(results[0]).toEqual({ block: true, reason: "Protected path: .env" });
-	});
 });

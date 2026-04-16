@@ -193,22 +193,6 @@ echo '  "plainIcons": true' >> .pi/settings.json
 
 ## Extensions
 
-### 🛡️ Safe Guard (`safe-guard`) — **default: off (opt-in)**
-
-Intercepts dangerous commands before execution. Blocks `rm -rf`, `git push --force`, `DROP TABLE`,
-`chmod 777`, and other destructive operations. Also protects configured paths from modification.
-
-This extension is available in `@ifi/oh-pi-extensions` but is no longer enabled by default in
-`@ifi/oh-pi`. Enable it explicitly via `pi config` if you want safety prompts.
-
-**How it works:** Hooks into the `tool_call` event for `bash`, `edit`, and `write` tools. When a
-dangerous pattern is detected, it prompts for confirmation or blocks outright.
-
-```
-Agent: bash rm -rf /
-→ ⛔ BLOCKED: Destructive command detected. Confirm? [y/N]
-```
-
 ### 📦 Git Guard (`git-guard`) — **default: on**
 
 Prevents accidental code loss by auto-creating stash checkpoints before the agent makes changes.
@@ -470,7 +454,7 @@ The LLM automatically deploys the colony when appropriate:
 
 |                | Theme      | Thinking | Includes                                 |
 | -------------- | ---------- | -------- | ---------------------------------------- |
-| ⚫ Full Power  | oh-pi Dark | high     | Recommended extensions + bg-process + ant-colony (`safe-guard` stays opt-in) |
+| ⚫ Full Power  | oh-pi Dark | high     | Recommended extensions + bg-process + ant-colony |
 | 🔴 Clean       | Default    | off      | No extensions, just core                 |
 | 🐜 Colony Only | oh-pi Dark | medium   | Ant-colony with minimal setup            |
 

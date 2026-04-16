@@ -14,7 +14,6 @@
 			"./packages/extensions/extensions/custom-footer.ts",
 			"./packages/extensions/extensions/external-editor.ts",
 			"./packages/extensions/extensions/git-guard.ts",
-			"./packages/extensions/extensions/safe-guard.ts",
 			"./packages/extensions/extensions/scheduler.ts",
 			"./packages/extensions/extensions/tool-metadata.ts",
 			"./packages/extensions/extensions/usage-tracker.ts",

@@ -59,7 +59,6 @@ un pilotage humain continu.
 ├── keybindings.json     Raccourcis Vim/Emacs (optionnel)
 ├── AGENTS.md            Directives IA par rôle
 ├── extensions/          8 extensions (7 par défaut + colonie)
-│   ├── safe-guard       Confirmation des commandes dangereuses + protection des chemins
 │   ├── git-guard        Points de contrôle stash auto + alerte dépôt sale
 │   ├── auto-session     Nommage de session depuis le premier message
 │   ├── custom-footer    Barre d'état améliorée (token/coût/temps/git/cwd)
@@ -84,7 +83,7 @@ un pilotage humain continu.
 
 |                | Inclut                                   |
 | -------------- | ---------------------------------------- |
-| 🟢 **Complet** | Extensions recommandées + colonie + bg-process (`safe-guard` reste optionnel) |
+| 🟢 **Complet** | Extensions recommandées + colonie + bg-process |
 | 🔵 **Propre**  | Aucune extension                         |
 | 🟣 **Colonie** | Colonie uniquement                       |
 

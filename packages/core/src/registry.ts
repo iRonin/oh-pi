@@ -62,13 +62,6 @@ export const THEMES = [
 /** Available extensions — each has a name, label function, and whether it's enabled by default. */
 export const EXTENSIONS = [
 	{
-		name: "safe-guard",
-		get label() {
-			return `${icon("shield")}  Safe Guard — Dangerous command confirm + path protection`;
-		},
-		default: false,
-	},
-	{
 		name: "git-guard",
 		get label() {
 			return `${icon("package")} Git Guard — Auto stash checkpoint + dirty repo warning + notify`;

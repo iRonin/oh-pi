@@ -34,11 +34,7 @@ describe("pi source switcher helpers", () => {
 
 	it("rewrites managed package sources while preserving object settings", () => {
 		const nextEntries = rewriteManagedPackageSources(
-			[
-				"npm:@ifi/oh-pi",
-				{ source: "npm:@ifi/oh-pi-extensions", extensions: ["-extensions/safe-guard.ts"] },
-				"npm:@ifi/oh-pi-themes",
-			],
+			["npm:@ifi/oh-pi", { source: "npm:@ifi/oh-pi-extensions" }, "npm:@ifi/oh-pi-themes"],
 			new Map([
 				["@ifi/oh-pi-extensions", "/repo/packages/extensions"],
 				["@ifi/oh-pi-themes", "/repo/packages/themes"],
@@ -50,7 +46,7 @@ describe("pi source switcher helpers", () => {
 
 		expect(nextEntries).toEqual([
 			"npm:@ifi/oh-pi",
-			{ source: "/repo/packages/extensions", extensions: ["-extensions/safe-guard.ts"] },
+			{ source: "/repo/packages/extensions" },
 			"/repo/packages/themes",
 			"/repo/packages/providers",
 			"/repo/packages/cursor",
@@ -59,13 +55,7 @@ describe("pi source switcher helpers", () => {
 
 	it("dedupes managed package entries while preserving object-style config", () => {
 		const nextEntries = dedupeManagedPackageEntries(
-			[
-				"npm:@ifi/oh-pi",
-				{ source: "/tmp/old/extensions", extensions: ["-extensions/safe-guard.ts"] },
-				"/tmp/new/extensions",
-				"/tmp/old/themes",
-				"/tmp/new/themes",
-			],
+			["npm:@ifi/oh-pi", "/tmp/old/extensions", "/tmp/new/extensions", "/tmp/old/themes", "/tmp/new/themes"],
 			(source) => {
 				if (source.includes("extensions")) {
 					return "@ifi/oh-pi-extensions";
@@ -77,11 +67,7 @@ describe("pi source switcher helpers", () => {
 			},
 		);
 
-		expect(nextEntries).toEqual([
-			"npm:@ifi/oh-pi",
-			{ source: "/tmp/old/extensions", extensions: ["-extensions/safe-guard.ts"] },
-			"/tmp/new/themes",
-		]);
+		expect(nextEntries).toEqual(["npm:@ifi/oh-pi", "/tmp/new/extensions", "/tmp/new/themes"]);
 	});
 
 	it("resolves workspace package directories from a repo checkout", () => {
@@ -104,12 +90,12 @@ describe("pi source switcher helpers", () => {
 	it("merges local package manifests into object settings so new extensions are not missed", () => {
 		expect(
 			mergeManagedPackageManifest(
-				{ source: "/repo/packages/extensions", extensions: ["extensions/existing.ts", "-extensions/safe-guard.ts"] },
+				{ source: "/repo/packages/extensions", extensions: ["extensions/existing.ts"] },
 				{ extensions: ["extensions/existing.ts", "extensions/worktree.ts"] },
 			),
 		).toEqual({
 			source: "/repo/packages/extensions",
-			extensions: ["extensions/existing.ts", "extensions/worktree.ts", "-extensions/safe-guard.ts"],
+			extensions: ["extensions/existing.ts", "extensions/worktree.ts"],
 		});
 	});
 

@@ -69,12 +69,6 @@ describe("EXTENSIONS", () => {
 		}
 	});
 
-	it("does not enable safe-guard by default", () => {
-		const safeGuard = EXTENSIONS.find((ext) => ext.name === "safe-guard");
-		expect(safeGuard).toBeDefined();
-		expect(safeGuard?.default).toBe(false);
-	});
-
 	it("exposes the optional plan mode extension", () => {
 		const plan = EXTENSIONS.find((ext) => ext.name === "plan");
 		expect(plan).toBeDefined();

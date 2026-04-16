@@ -6,7 +6,6 @@ Core first-party extensions for pi.
 
 This package includes extensions such as:
 - adaptive-routing / route
-- safe-guard
 - git-guard
 - auto-session-name
 - custom-footer
@@ -35,7 +34,7 @@ npx @ifi/oh-pi
 
 ## What it provides
 
-These extensions add commands, tools, UI widgets, safety checks, background process handling,
+These extensions add commands, tools, UI widgets, background process handling,
 usage monitoring, adaptive model routing, scheduling features, tool execution metadata,
 external-editor integration, git worktree awareness, and runtime performance protection
 (`/watchdog`, `/watchdog blame`, `/safe-mode`) to pi.

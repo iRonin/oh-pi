@@ -24,7 +24,7 @@ npx @ifi/oh-pi --remove             # uninstall all oh-pi packages from pi
 
 | Package                 | Contents                                                                                    |
 | ----------------------- | ------------------------------------------------------------------------------------------- |
-| `@ifi/oh-pi-extensions`      | safe-guard, git-guard, auto-session, custom-footer, compact-header, external-editor, auto-update, bg-process, watchdog, worktree |
+| `@ifi/oh-pi-extensions`      | git-guard, auto-session, custom-footer, compact-header, external-editor, auto-update, bg-process, watchdog, worktree |
 | `@ifi/oh-pi-ant-colony`       | Multi-agent swarm extension (`/colony`, colony commands)                                     |
 | `@ifi/pi-extension-subagents` | Subagent orchestration extension (`subagent`, `subagent_status`, `/run`, `/chain`, `/parallel`) |
 | `@ifi/pi-plan`                | Planning mode extension (`/plan`, `Alt+P`, `task_agents`, `set_plan`)                       |
@@ -33,9 +33,6 @@ npx @ifi/oh-pi --remove             # uninstall all oh-pi packages from pi
 | `@ifi/oh-pi-prompts`          | review, fix, explain, refactor, test, commit, pr, and more                                  |
 | `@ifi/oh-pi-skills`          | web-search, debug-helper, git-workflow, rust-workspace-bootstrap, and more                  |
 | `@ifi/oh-pi-agents`          | AGENTS.md templates for common roles                                                        |
-
-> **Note:** `safe-guard` is included in `@ifi/oh-pi-extensions` but disabled by default. Enable it
-> via `pi config` if you want command/path safety prompts.
 
 ## Getting Started
 
