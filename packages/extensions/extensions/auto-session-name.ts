@@ -53,13 +53,13 @@ function overlapRatio(a: string, b: string): number {
 	return shared / Math.max(left.size, right.size);
 }
 
-function normalizeSessionId(sessionId: string | undefined): string | undefined {
-	const normalized = sessionId?.trim();
+function normalizeSessionFile(sessionFile: string | undefined): string | undefined {
+	const normalized = sessionFile?.trim();
 	return normalized || undefined;
 }
 
-function buildResumeCommandHint(sessionId: string): string {
-	return [`Session id: ${sessionId}`, `Resume now: pi --session ${sessionId}`].join("\n");
+function buildResumeCommandHint(sessionFile: string): string {
+	return [`Session file: ${sessionFile}`, `Resume now: pi --session ${JSON.stringify(sessionFile)}`].join("\n");
 }
 
 function isFocusShift(firstUserText: string, latestUserText: string): boolean {
@@ -107,16 +107,16 @@ export default function autoSessionNameExtension(pi: ExtensionAPI) {
 	let lastAutoName = "";
 	let compactContinuationQueued = false;
 
-	const emitResumeHint = (reason: "shutdown" | "switch", sessionId: string | undefined) => {
-		const normalizedSessionId = normalizeSessionId(sessionId);
-		if (!normalizedSessionId) {
+	const emitResumeHint = (reason: "shutdown" | "switch", sessionFile: string | undefined) => {
+		const normalizedSessionFile = normalizeSessionFile(sessionFile);
+		if (!normalizedSessionFile) {
 			return;
 		}
 
 		const prefix = reason === "shutdown" ? "Session saved." : "Session switched.";
 		pi.sendMessage({
 			customType: "session-resume-hint",
-			content: `${prefix}\n${buildResumeCommandHint(normalizedSessionId)}`,
+			content: `${prefix}\n${buildResumeCommandHint(normalizedSessionFile)}`,
 			display: true,
 		});
 	};
@@ -157,10 +157,10 @@ export default function autoSessionNameExtension(pi: ExtensionAPI) {
 	});
 
 	pi.on("session_switch", (_event, ctx) => {
-		emitResumeHint("switch", ctx.sessionManager?.getSessionId?.());
+		emitResumeHint("switch", ctx.sessionManager?.getSessionFile?.());
 	});
 
 	pi.on("session_shutdown", (_event, ctx) => {
-		emitResumeHint("shutdown", ctx.sessionManager?.getSessionId?.());
+		emitResumeHint("shutdown", ctx.sessionManager?.getSessionFile?.());
 	});
 }
