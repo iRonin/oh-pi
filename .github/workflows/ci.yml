@@ -278,6 +278,45 @@ jobs:
       - name: Run tests
         run: pnpm test
 
+  coverage:
+    name: Coverage (Codecov)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: pnpm/action-setup@v4.4.0
+
+      - uses: actions/setup-node@v6.3.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build core (required for CLI test resolution)
+        run: pnpm --filter @ifi/oh-pi-core build
+
+      - name: Run tests with coverage
+        run: pnpm test:coverage
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: coverage-report
+          path: coverage/
+          if-no-files-found: error
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5.5.1
+        with:
+          files: coverage/lcov.info
+          flags: repo
+          name: repo-coverage
+          use_oidc: true
+
   compat:
     name: Compatibility (pi ${{ matrix.label }})
     runs-on: ubuntu-latest

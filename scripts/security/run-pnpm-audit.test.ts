@@ -54,7 +54,7 @@ process.exit(0);
 		const output = runAudit(fakePnpmPath, ["--prod", "--audit-level=high"]);
 
 		expect(output).toContain("audit --prod --audit-level=high");
-	});
+	}, 15_000);
 
 	it("treats npm retired audit endpoint errors as non-fatal", () => {
 		const fakePnpmPath = createFakePnpm(`#!/usr/bin/env node
@@ -68,7 +68,7 @@ process.exit(1);
 		expect(result.status).toBe(0);
 		expect(output).toContain("retired audit endpoints");
 		expect(output).toContain("non-fatal upstream failure");
-	});
+	}, 15_000);
 
 	it("preserves non-endpoint audit failures", () => {
 		const fakePnpmPath = createFakePnpm(`#!/usr/bin/env node
@@ -78,5 +78,5 @@ process.exit(7);
 
 		expect(() => runAudit(fakePnpmPath, ["-D"]))
 			.toThrowError(/audit found 1 high severity vulnerability/);
-	});
+	}, 15_000);
 });

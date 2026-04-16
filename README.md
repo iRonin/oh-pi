@@ -9,6 +9,7 @@
 Like oh-my-zsh for pi — but with an autonomous ant colony.
 
 [![CI](https://github.com/ifiokjr/oh-pi/actions/workflows/ci.yml/badge.svg)](https://github.com/ifiokjr/oh-pi/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/ifiokjr/oh-pi/graph/badge.svg?branch=main)](https://codecov.io/gh/ifiokjr/oh-pi)
 [![license](https://img.shields.io/github/license/ifiokjr/oh-pi)](./LICENSE)
 [![node](https://img.shields.io/node/v/@ifi/oh-pi)](https://nodejs.org)
 
@@ -544,6 +545,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for contributor workflow, changeset req
 pnpm build          # Build every workspace package that exposes a build script
 pnpm typecheck      # Type check with tsgo (fast)
 pnpm test           # Run all tests
+pnpm test:coverage  # Run tests with repo-wide coverage reporting
 pnpm lint           # Biome lint + format check
 pnpm security:check # Dependency allowlist + vulnerability audits
 pnpm lint:fix       # Auto-fix lint issues

@@ -41,6 +41,7 @@
 		"security:audit:dev": "node ./scripts/security/run-pnpm-audit.mjs -D --audit-level=high",
 		"security:check": "pnpm security:allowlist && pnpm security:audit:prod && pnpm security:audit:dev",
 		"test": "vitest run",
+		"test:coverage": "vitest run --coverage",
 		"verify:compiled-tarballs": "node ./scripts/verify-compiled-tarballs.mjs",
 		"verify:published-packages": "node ./scripts/verify-published-packages.mjs",
 		"verify:pi-compat": "node ./scripts/verify-pi-compat.mjs",
@@ -65,6 +66,7 @@
 		"@mariozechner/pi-tui": "0.56.1",
 		"@types/node": "^22.0.0",
 		"@typescript/native-preview": "7.0.0-dev.20260305.1",
+		"@vitest/coverage-v8": "^3.2.4",
 		"typescript": "^5.7.0",
 		"vitest": "^3.0.0"
 	},
