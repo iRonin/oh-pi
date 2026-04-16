@@ -36,6 +36,19 @@ describe("ollama models", () => {
 		expect(compat?.maxTokensField).toBe("max_tokens");
 	});
 
+	it("applies z.ai compat defaults to cloud glm models", () => {
+		const model = toOllamaModel({ id: "glm-5.1", source: "cloud", reasoning: true, input: ["text"], maxTokens: 25_344 });
+		const compat = model.compat as {
+			supportsReasoningEffort?: boolean;
+			thinkingFormat?: string;
+			zaiToolStream?: boolean;
+		} | undefined;
+		expect(model.maxTokens).toBe(131_072);
+		expect(compat?.supportsReasoningEffort).toBe(false);
+		expect(compat?.thinkingFormat).toBe("zai");
+		expect(compat?.zaiToolStream).toBe(true);
+	});
+
 	it("discovers cloud models with bearer auth", async () => {
 		const backend = await createTestOllamaBackend();
 		backend.setModels([
@@ -84,8 +97,17 @@ describe("ollama models", () => {
 		process.env.PI_OLLAMA_CLOUD_MODELS_URL = `${backend.apiUrl}/models`;
 		process.env.PI_OLLAMA_CLOUD_SHOW_URL = `${backend.origin}/api/show`;
 		const models = await discoverOllamaCloudModels();
+		const glmCompat = models?.[0]?.compat as {
+			supportsReasoningEffort?: boolean;
+			thinkingFormat?: string;
+			zaiToolStream?: boolean;
+		} | undefined;
 		expect(models?.map((model) => model.id)).toEqual(["glm-5.1", "kimi-k2.5"]);
 		expect(models?.[0]?.reasoning).toBe(true);
+		expect(models?.[0]?.maxTokens).toBe(131_072);
+		expect(glmCompat?.supportsReasoningEffort).toBe(false);
+		expect(glmCompat?.thinkingFormat).toBe("zai");
+		expect(glmCompat?.zaiToolStream).toBe(true);
 		expect(models?.[1]?.input).toEqual(["text", "image"]);
 		expect(backend.getAuthHeaders()).toEqual(["", "", ""]);
 		await backend.close();

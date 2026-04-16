@@ -48,6 +48,8 @@ const DEFAULT_CONTEXT_WINDOW = 128_000;
 const DEFAULT_MAX_TOKENS = 16_384;
 const MAX_DISCOVERY_CONCURRENCY = 6;
 
+const OLLAMA_CLOUD_ZAI_REASONING_MAX_TOKENS = 131_072;
+
 const OLLAMA_OPENAI_COMPAT: NonNullable<OllamaProviderModel["compat"]> = {
 	supportsDeveloperRole: false,
 	supportsReasoningEffort: true,
@@ -59,6 +61,12 @@ const OLLAMA_OPENAI_COMPAT: NonNullable<OllamaProviderModel["compat"]> = {
 		xhigh: "high",
 	},
 	maxTokensField: "max_tokens",
+};
+
+const OLLAMA_CLOUD_ZAI_COMPAT: Partial<NonNullable<OllamaProviderModel["compat"]>> = {
+	supportsReasoningEffort: false,
+	thinkingFormat: "zai",
+	zaiToolStream: true,
 };
 
 const FALLBACK_OLLAMA_CLOUD_MODELS: OllamaProviderModel[] = [
@@ -195,7 +203,8 @@ export function mergeOllamaLocalCatalog(
 
 export function toOllamaModel(model: Partial<OllamaProviderModel> & Pick<OllamaProviderModel, "id">): OllamaProviderModel {
 	const contextWindow = normalizePositiveInteger(model.contextWindow, DEFAULT_CONTEXT_WINDOW);
-	const maxTokens = normalizePositiveInteger(model.maxTokens, inferMaxTokens(contextWindow));
+	const maxTokens = normalizeModelMaxTokens(model, contextWindow);
+	const compatDefaults = getOllamaCompatDefaults(model);
 	return {
 		id: model.id,
 		name: applySourceSuffix(model.name?.trim() || formatDisplayName(model.id), model.source),
@@ -204,7 +213,7 @@ export function toOllamaModel(model: Partial<OllamaProviderModel> & Pick<OllamaP
 		cost: model.cost ? { ...model.cost } : { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow,
 		maxTokens,
-		compat: { ...OLLAMA_OPENAI_COMPAT, ...(model.compat ?? {}) },
+		compat: { ...OLLAMA_OPENAI_COMPAT, ...compatDefaults, ...(model.compat ?? {}) },
 		source: model.source,
 		localAvailability: sanitizeLocalAvailability(model.localAvailability),
 		family: sanitizeOptionalString(model.family),
@@ -320,7 +329,14 @@ function sanitizeInput(input: OllamaProviderModel["input"] | undefined): ("text"
 	return [...next];
 }
 
-function inferMaxTokens(contextWindow: number): number {
+function inferMaxTokens(
+	contextWindow: number,
+	model: Partial<Pick<OllamaProviderModel, "id" | "source">> = {},
+): number {
+	if (isOllamaCloudZaiModel(model)) {
+		return OLLAMA_CLOUD_ZAI_REASONING_MAX_TOKENS;
+	}
+
 	if (contextWindow >= 1_000_000) {
 		return 65_536;
 	}
@@ -331,6 +347,34 @@ function inferMaxTokens(contextWindow: number): number {
 		return 20_480;
 	}
 	return DEFAULT_MAX_TOKENS;
+}
+
+function normalizeModelMaxTokens(
+	model: Partial<OllamaProviderModel> & Pick<OllamaProviderModel, "id">,
+	contextWindow: number,
+): number {
+	const inferred = inferMaxTokens(contextWindow, model);
+	const normalized = normalizePositiveInteger(model.maxTokens, inferred);
+
+	if (!isOllamaCloudZaiModel(model)) {
+		return normalized;
+	}
+
+	return Math.max(normalized, OLLAMA_CLOUD_ZAI_REASONING_MAX_TOKENS);
+}
+
+function getOllamaCompatDefaults(
+	model: Partial<Pick<OllamaProviderModel, "id" | "source">>,
+): Partial<NonNullable<OllamaProviderModel["compat"]>> {
+	if (isOllamaCloudZaiModel(model)) {
+		return OLLAMA_CLOUD_ZAI_COMPAT;
+	}
+
+	return {};
+}
+
+function isOllamaCloudZaiModel(model: Partial<Pick<OllamaProviderModel, "id" | "source">>): boolean {
+	return model.source === "cloud" && typeof model.id === "string" && model.id.trim().toLowerCase().startsWith("glm-");
 }
 
 function normalizePositiveInteger(value: number | undefined, fallback: number): number {

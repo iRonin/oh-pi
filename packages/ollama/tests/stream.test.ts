@@ -1,0 +1,172 @@
+import http from "node:http";
+import type { AddressInfo } from "node:net";
+import { streamSimpleOpenAICompletions, type Model } from "@mariozechner/pi-ai";
+import { describe, expect, it } from "vitest";
+import { toOllamaModel } from "../models.js";
+
+type ChatCompletionPayload = {
+	model?: string;
+	max_tokens?: number;
+	reasoning_effort?: string;
+	enable_thinking?: boolean;
+	stream?: boolean;
+};
+
+async function createReasoningAwareChatBackend(): Promise<{
+	apiUrl: string;
+	requests: ChatCompletionPayload[];
+	close: () => Promise<void>;
+}> {
+	const requests: ChatCompletionPayload[] = [];
+	const server = http.createServer((req, res) => {
+		if (req.url !== "/v1/chat/completions" || req.method !== "POST") {
+			res.writeHead(404, { "Content-Type": "text/plain" });
+			res.end("not found");
+			return;
+		}
+
+		let body = "";
+		req.on("data", (chunk) => {
+			body += String(chunk);
+		});
+		req.on("end", () => {
+			const payload = JSON.parse(body || "{}") as ChatCompletionPayload;
+			requests.push(payload);
+
+			const shouldReturnVisibleText =
+				typeof payload.max_tokens === "number" &&
+				payload.max_tokens >= 32_000 &&
+				payload.reasoning_effort === undefined &&
+				typeof payload.enable_thinking === "boolean";
+
+			res.writeHead(200, {
+				"Cache-Control": "no-cache",
+				Connection: "keep-alive",
+				"Content-Type": "text/event-stream",
+			});
+
+			if (payload.enable_thinking) {
+				writeSse(res, {
+					choices: [{ delta: { reasoning: "Plan the exact reply first." }, finish_reason: null }],
+				});
+			}
+
+			if (shouldReturnVisibleText) {
+				writeSse(res, {
+					choices: [{ delta: { content: "OK" }, finish_reason: null }],
+				});
+			} else {
+				writeSse(res, {
+					choices: [{ delta: { reasoning: "Spent the full budget reasoning." }, finish_reason: null }],
+				});
+			}
+
+			writeSse(res, {
+				choices: [{ delta: {}, finish_reason: "stop" }],
+				usage: {
+					prompt_tokens: 10,
+					completion_tokens: shouldReturnVisibleText ? 12 : 96,
+					prompt_tokens_details: { cached_tokens: 0 },
+					completion_tokens_details: { reasoning_tokens: shouldReturnVisibleText ? 4 : 96 },
+				},
+			});
+			writeSse(res, "[DONE]");
+			res.end();
+		});
+	});
+
+	await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+	const port = (server.address() as AddressInfo).port;
+	const apiUrl = `http://127.0.0.1:${port}/v1`;
+
+	return {
+		apiUrl,
+		requests,
+		async close() {
+			await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+		},
+	};
+}
+
+function writeSse(res: http.ServerResponse, chunk: unknown): void {
+	const data = typeof chunk === "string" ? chunk : JSON.stringify(chunk);
+	res.write(`data: ${data}\n\n`);
+}
+
+function createCloudGlmModel(baseUrl: string): Model<"openai-completions"> {
+	return {
+		...toOllamaModel({ id: "glm-5.1", source: "cloud", reasoning: true, input: ["text"], maxTokens: 25_344 }),
+		api: "openai-completions",
+		provider: "ollama-cloud",
+		baseUrl,
+	};
+}
+
+function extractText(blocks: Array<{ type: string; text?: string }>): string {
+	return blocks.filter((block) => block.type === "text").map((block) => block.text ?? "").join("");
+}
+
+describe("ollama glm cloud streaming", () => {
+	it("uses z.ai thinking flags and a larger default token budget when reasoning is enabled", async () => {
+		const backend = await createReasoningAwareChatBackend();
+
+		try {
+			const payloads: ChatCompletionPayload[] = [];
+			const result = await streamSimpleOpenAICompletions(
+				createCloudGlmModel(backend.apiUrl),
+				{
+					messages: [{ role: "user", content: "Reply with exactly: OK", timestamp: Date.now() }],
+				},
+				{
+					apiKey: "test-key",
+					reasoning: "medium",
+					onPayload: (payload) => {
+						payloads.push(payload as ChatCompletionPayload);
+					},
+				},
+			).result();
+
+			expect(extractText(result.content as Array<{ type: string; text?: string }>)).toBe("OK");
+			expect(payloads[0]).toMatchObject({
+				enable_thinking: true,
+				max_tokens: 32_000,
+				model: "glm-5.1",
+			});
+			expect(payloads[0]?.reasoning_effort).toBeUndefined();
+			expect(backend.requests[0]).toMatchObject({ enable_thinking: true, max_tokens: 32_000 });
+		} finally {
+			await backend.close();
+		}
+	});
+
+	it("explicitly disables z.ai thinking by default so glm replies stay visible", async () => {
+		const backend = await createReasoningAwareChatBackend();
+
+		try {
+			const payloads: ChatCompletionPayload[] = [];
+			const result = await streamSimpleOpenAICompletions(
+				createCloudGlmModel(backend.apiUrl),
+				{
+					messages: [{ role: "user", content: "Reply with exactly: OK", timestamp: Date.now() }],
+				},
+				{
+					apiKey: "test-key",
+					onPayload: (payload) => {
+						payloads.push(payload as ChatCompletionPayload);
+					},
+				},
+			).result();
+
+			expect(extractText(result.content as Array<{ type: string; text?: string }>)).toBe("OK");
+			expect(payloads[0]).toMatchObject({
+				enable_thinking: false,
+				max_tokens: 32_000,
+				model: "glm-5.1",
+			});
+			expect(payloads[0]?.reasoning_effort).toBeUndefined();
+			expect(backend.requests[0]).toMatchObject({ enable_thinking: false, max_tokens: 32_000 });
+		} finally {
+			await backend.close();
+		}
+	});
+});
