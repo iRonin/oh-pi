@@ -269,18 +269,22 @@ function resolveAgentPaths(agentPaths: string[], settingsBaseDir: string): strin
 /**
  * Read the `agents` array from a project's `.pi/settings.json`.
  * Returns undefined if no project settings or no agents field.
+ * `baseDir` is the project root (parent of `.pi`), not the `.pi` dir itself.
  */
 function readProjectAgentPaths(cwd: string): { paths: string[]; baseDir: string } | undefined {
 	// Walk up from cwd looking for .pi/settings.json with an agents array
 	let current = path.resolve(cwd);
 	const home = os.homedir();
 	for (let i = 0; i < 30; i++) {
-		const settingsPath = path.join(current, ".pi", "settings.json");
+		const piDir = path.join(current, ".pi");
+		const settingsPath = path.join(piDir, "settings.json");
 		try {
 			const raw = fs.readFileSync(settingsPath, "utf-8");
 			const parsed = JSON.parse(raw);
 			if (Array.isArray(parsed.agents) && parsed.agents.length > 0) {
-				return { paths: parsed.agents as string[], baseDir: path.join(current, ".pi") };
+				// baseDir = current (the project root), NOT the .pi dir
+				// so that ".pi/agents" resolves correctly relative to project root
+				return { paths: parsed.agents as string[], baseDir: current };
 			}
 		} catch {
 			// no settings or invalid JSON — continue walking up
