@@ -677,7 +677,8 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 					.join("\n\n");
 
 				const summary = `${ok}/${results.length} succeeded${downgradeNote}`;
-				const fullContent = `${summary}\n\n${aggregatedOutput}`;
+				const callDetail = buildCallDetailBlock(params);
+				const fullContent = `${summary}\n\n${aggregatedOutput}${callDetail}`;
 
 				return {
 					content: [{ type: "text", text: fullContent }],
@@ -686,6 +687,7 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 						results,
 						progress: params.includeProgress ? allProgress : undefined,
 						artifacts: allArtifactPaths.length ? { dir: artifactsDir, files: allArtifactPaths } : undefined,
+						callParams: { ...params },
 					},
 				};
 			}
@@ -853,9 +855,11 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 							progress: params.includeProgress ? allProgress : undefined,
 							artifacts: allArtifactPaths.length ? { dir: artifactsDir, files: allArtifactPaths } : undefined,
 							truncation: r.truncation,
+							callParams: { ...params },
 						},
 						isError: true,
 					};
+				const callDetail = buildCallDetailBlock(params);
 				return {
 					content: [{ type: "text", text: finalizedOutput.displayOutput || "(no output)" }],
 					details: {
@@ -864,6 +868,7 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 						progress: params.includeProgress ? allProgress : undefined,
 						artifacts: allArtifactPaths.length ? { dir: artifactsDir, files: allArtifactPaths } : undefined,
 						truncation: r.truncation,
+						callParams: { ...params },
 					},
 				};
 			}
