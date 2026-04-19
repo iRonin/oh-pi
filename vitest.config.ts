@@ -46,6 +46,7 @@ export default defineConfig({
 			"packages/web-server/tests/**/*.test.ts",
 			"packages/web-client/tests/**/*.test.ts",
 			"packages/web-remote/tests/**/*.test.ts",
+			"packages/subagents-harness/tests/**/*.test.ts",
 		],
 		coverage: {
 			provider: "v8",
