@@ -238,6 +238,21 @@ export function renderSubagentResult(
 			c.addChild(new Text(truncLine(theme.fg("dim", `Session: ${shortenPath(r.sessionFile)}`), w), 0, 0));
 		}
 
+		// Show call params (model, cwd, skills) for observability
+		if (d.callParams) {
+			const p = d.callParams;
+			const callInfo: string[] = [];
+			if (p.model) callInfo.push(theme.fg("dim", `model: ${p.model}`));
+			if (p.cwd) callInfo.push(theme.fg("dim", `cwd: ${p.cwd}`));
+			if (p.skill) {
+				const skillStr = Array.isArray(p.skill) ? p.skill.join(", ") : p.skill;
+				callInfo.push(theme.fg("dim", `skills: ${skillStr}`));
+			}
+			if (callInfo.length) {
+				c.addChild(new Text(truncLine(callInfo.join(" | "), w), 0, 0));
+			}
+		}
+
 		if (r.artifactPaths) {
 			c.addChild(new Spacer(1));
 			c.addChild(
@@ -425,6 +440,17 @@ export function renderSubagentResult(
 		}
 
 		c.addChild(new Spacer(1));
+	}
+
+	// Show call params for multi-step results
+	if (d.callParams) {
+		const p = d.callParams;
+		const callInfo: string[] = [];
+		if (p.model) callInfo.push(theme.fg("dim", `model: ${p.model}`));
+		if (p.cwd) callInfo.push(theme.fg("dim", `cwd: ${p.cwd}`));
+		if (callInfo.length) {
+			c.addChild(new Text(truncLine(`  call: ${callInfo.join(" | ")}`, w), 0, 0));
+		}
 	}
 
 	if (d.artifacts) {
