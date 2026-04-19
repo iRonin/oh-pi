@@ -1,0 +1,21 @@
+{
+	"name": "@ifi/pi-subagents-harness",
+	"version": "0.1.0",
+	"description": "Test harness for subagent orchestration — simulates multi-agent workflows, failure handling, and context cleanliness",
+	"type": "module",
+	"private": true,
+	"keywords": [
+		"pi-package",
+		"pi",
+		"pi-coding-agent",
+		"subagents",
+		"testing",
+		"orchestration"
+	],
+	"scripts": {
+		"test": "vitest run"
+	},
+	"devDependencies": {
+		"vitest": "^3.0.0"
+	}
+}
