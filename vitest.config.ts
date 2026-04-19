@@ -70,6 +70,7 @@ export default defineConfig({
 			"packages/pi-remote-tailscale/tests/**/*.test.ts",
 			"packages/pi-bash-live-view/tests/**/*.test.ts",
 			"packages/pi-pretty/tests/**/*.test.ts",
+			"packages/subagents-harness/tests/**/*.test.ts",
 		],
 		coverage: {
 			provider: "v8",
