@@ -25,17 +25,21 @@ The user manages 17 project-specific ECSC agents (reviewer, strategist, drafter,
 
 | # | Branch | What | Status | Notes |
 |---|---|---|---|---|
-| #202 | `fix/subagent-cwd-skill-resolution` | Skills resolve against task `cwd`, not runtime `cwd` | Open | Fixes `--no-skills` bug when subagent has different cwd. Test coverage fix pushed. |
-| #205 | `fix/subagent-inherit-session-model` | Subagents inherit session's active model before falling back to adaptive router | Open | Prevents model switch from kilocode → openrouter. Test coverage fix pushed. |
-| #207 | `feat/cascading-agents` | Discover agents from all ancestor directories (nearest wins) | Open | Enables project agents from nested subdirs. 276 lines. |
+| #202 | `fix/subagent-cwd-skill-resolution` | Skills resolve against task `cwd`, not runtime `cwd` | Open | `missing is not defined` bug exists on merged branches — fixed locally on `fix/subagent-widget-wrap-debug`. |
+| #205 | `fix/subagent-inherit-session-model` | Subagents inherit session's active model before falling back to adaptive router | Open | Test coverage fix pushed. |
+| #207 | `feat/cascading-agents` | Discover agents from all ancestor directories (nearest wins) | Open | Superseded by #220 (explicit paths is cleaner). |
+| #215 | `fix/subagent-custom-tool-resolution` | Custom tool names (`read_full`) mapped to `--extension` instead of rejected by `--tools` | Open | |
+| #220 | `feat/subagent-explicit-agent-paths` | `.pi/settings.json` `"agents"` array overrides auto-discovery | Open | **Critical** — fixes cwd-independent agent discovery. |
+| #214 | Issue | Custom tool names issue (paired with #215) | Open | |
+| #219 | Issue | Explicit agent paths issue (paired with #220) | Open |
 
 **Not ours (other open PRs):** #197 (Mistral API), #173 (BTW overlay), #107 (watchdog Bun compat — needs lint fix, maintainer gave guidance).
 
-## What's in `ironin-release` (beyond the 3 PRs)
+## What's in `ironin-release` (beyond upstream PRs)
 
 | Commit | What |
 |---|---|
-| `b342515` | **Explicit agent paths** — `.pi/settings.json` `"agents": [".pi/agents"]` disables auto-discovery, loads ONLY listed dirs (no builtins, no user agents) |
+| `b342515` | **Explicit agent paths** — `.pi/settings.json` `"agents": [".pi/agents"]` disables auto-discovery, loads ONLY listed dirs (no builtins, no user agents). **Note:** newer clean PR #220 has improved `baseDir` resolution. |
 | `738ec63` | Fix: agent paths resolve relative to project root, not `.pi` dir |
 | `42b754e` | **Verbose call params** — `renderCall` shows agent, task preview, model, cwd, skills; `renderResult` shows call params; collapsible JSON block injected into result content |
 | `db59bb1` | Debug logging for model/skill resolution (behind `PI_SUBAGENTS_DEBUG=1`) |
