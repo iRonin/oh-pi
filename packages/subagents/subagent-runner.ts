@@ -25,6 +25,23 @@ import {
 	MAX_PARALLEL_CONCURRENCY,
 } from "./parallel-utils.js";
 
+/**
+ * Pi core builtin tool names. Anything else passed via --tools is rejected
+ * with "Unknown tool" warnings by the CLI args parser.
+ */
+const KNOWN_BUILTIN_TOOLS = new Set(["read", "bash", "edit", "write", "grep", "find", "ls", "subagent"]);
+
+/**
+ * Known custom tool names mapped to their npm package or extension path.
+ * When a tool name matches here but isn't a builtin, the runner injects
+ * the corresponding --extension flag so the tool is registered at runtime.
+ *
+ * Add entries here when agents reference custom tools by name.
+ */
+const KNOWN_CUSTOM_TOOLS: Record<string, string> = {
+	read_full: "npm:@ironin/pi-less-shitty#packages/read-full",
+};
+
 interface SubagentRunConfig {
 	id: string;
 	steps: RunnerStep[];
@@ -296,9 +313,16 @@ async function runSingleStep(
 		for (const tool of step.tools) {
 			if (tool.includes("/") || tool.endsWith(".ts") || tool.endsWith(".js")) {
 				toolExtensionPaths.push(tool);
-			} else {
+			} else if (KNOWN_BUILTIN_TOOLS.has(tool)) {
 				builtinTools.push(tool);
+			} else if (tool in KNOWN_CUSTOM_TOOLS) {
+				// Custom tool — inject via --extension, don't pass to --tools
+				const extPath = KNOWN_CUSTOM_TOOLS[tool];
+				if (!toolExtensionPaths.includes(extPath)) {
+					toolExtensionPaths.push(extPath);
+				}
 			}
+			// else: unknown tool name — silently skip (pi CLI would warn anyway)
 		}
 		if (builtinTools.length > 0) args.push("--tools", builtinTools.join(","));
 	}
