@@ -20,6 +20,23 @@ import { getPiSpawnCommand } from "./pi-spawn.js";
 import { persistSingleOutput } from "./single-output.js";
 import { DEFAULT_MAX_OUTPUT, getSubagentDepthEnv, truncateOutput } from "./types.js";
 
+/**
+ * Pi core builtin tool names. Anything else passed via --tools is rejected
+ * with "Unknown tool" warnings by the CLI args parser.
+ */
+const KNOWN_BUILTIN_TOOLS = new Set(["read", "bash", "edit", "write", "grep", "find", "ls", "subagent"]);
+
+/**
+ * Known custom tool names mapped to their npm package or extension path.
+ * When a tool name matches here but isn't a builtin, the runner injects
+ * the corresponding --extension flag so the tool is registered at runtime.
+ *
+ * Add entries here when agents reference custom tools by name.
+ */
+const KNOWN_CUSTOM_TOOLS: Record<string, string> = {
+	read_full: "npm:@ironin/pi-less-shitty#packages/read-full",
+};
+
 interface SubagentRunConfig {
 	id: string;
 	steps: RunnerStep[];
@@ -329,21 +346,24 @@ async function runSingleStep(
 
 	// Only pi's 7 builtin tools can be passed via --tools.
 	// Extension-registered tools (e.g. read_full) are not in allTools
-	// And get silently dropped when passed as --tools because the
-	// Whitelist is applied before extensions load.
-	const BUILTIN_TOOL_NAMES = new Set(["read", "bash", "edit", "write", "grep", "find", "ls"]);
-
+	// and get silently dropped when passed as --tools because the
+	// whitelist is applied before extensions load.
 	const toolExtensionPaths: string[] = [];
 	if (step.tools?.length) {
 		const builtinTools: string[] = [];
 		for (const tool of step.tools) {
 			if (tool.includes("/") || tool.endsWith(".ts") || tool.endsWith(".js")) {
 				toolExtensionPaths.push(tool);
-			} else if (BUILTIN_TOOL_NAMES.has(tool)) {
+			} else if (KNOWN_BUILTIN_TOOLS.has(tool)) {
 				builtinTools.push(tool);
+			} else if (tool in KNOWN_CUSTOM_TOOLS) {
+				// Custom tool — inject via --extension, don't pass to --tools
+				const extPath = KNOWN_CUSTOM_TOOLS[tool];
+				if (!toolExtensionPaths.includes(extPath)) {
+					toolExtensionPaths.push(extPath);
+				}
 			}
-			// Else: extension-registered tool (e.g. read_full) — let the
-			// Extension register it naturally; don't pass via --tools.
+			// else: unknown tool name — silently skip (pi CLI would warn anyway)
 		}
 		if (builtinTools.length > 0) {
 			args.push("--tools", builtinTools.join(","));
