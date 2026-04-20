@@ -114,10 +114,9 @@ export async function runSync(
 		}
 	}
 
-	const skillNames = options.skills ?? agent.skills ?? [];
-	const { resolved: resolvedSkills, missing: missingSkills } = resolveSkills(skillNames, cwd ?? runtimeCwd);
-
-	// When explicit skills are specified (via options or agent config), disable
+tconst skillNames = options.skills ?? agent.skills ?? [];
+tconst resolveCwd = cwd ?? runtimeCwd;
+tconst { resolved: resolvedSkills, missing: missingSkills } = resolveSkills(skillNames, resolveCwd);	// When explicit skills are specified (via options or agent config), disable
 	// pi's own skill discovery so the spawned process doesn't inject the full
 	// <available_skills> catalog.  This mirrors how extensions are scoped above.
 	if (skillNames.length > 0) {
