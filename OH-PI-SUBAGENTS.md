@@ -40,6 +40,7 @@ The user manages 17 project-specific ECSC agents (reviewer, strategist, drafter,
 | `42b754e` | **Verbose call params** — `renderCall` shows agent, task preview, model, cwd, skills; `renderResult` shows call params; collapsible JSON block injected into result content |
 | `db59bb1` | Debug logging for model/skill resolution (behind `PI_SUBAGENTS_DEBUG=1`) |
 | `a14cb31` | **Subagent harness** — test framework for simulating multi-agent orchestration, failure modes, recovery, context cleanliness |
+| `1da8b33` | **Custom tool resolution** — `read_full` and other non-builtin tool names mapped to `--extension` instead of rejected by `--tools` |
 
 ## Key Technical Decisions
 
@@ -48,6 +49,7 @@ The user manages 17 project-specific ECSC agents (reviewer, strategist, drafter,
 3. **Model inheritance** — Session model (priority 3) sits between frontmatter model (priority 2) and adaptive router (priority 4).
 4. **CWD-aware skill resolution** — Skills resolve against task `cwd ?? chainCwd ?? runtimeCwd`, not just runtime cwd.
 5. **Call params in results** — Every sync result includes `callParams` in details for TUI observability.
+6. **Custom tool resolution** — Tool names in agent frontmatter that aren't pi builtins (e.g. `read_full`) are mapped to extension paths via `KNOWN_CUSTOM_TOOLS` in the runner, injected as `--extension` instead of rejected by `--tools`.
 
 ## Local Setup
 
