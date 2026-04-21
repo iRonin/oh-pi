@@ -238,11 +238,11 @@ async function extractQuestions(
 		return null;
 	}
 
+	const JSON_FENCE_START_RE = /^```(?:json)?\s*\n?/i;
+	const JSON_FENCE_END_RE = /\n?```\s*$/i;
+
 	// Strip markdown code fences if present
-	const jsonText = responseText
-		.replace(/^```(?:json)?\s*\n?/i, "")
-		.replace(/\n?```\s*$/i, "")
-		.trim();
+	const jsonText = responseText.replace(JSON_FENCE_START_RE, "").replace(JSON_FENCE_END_RE, "").trim();
 
 	try {
 		const parsed = JSON.parse(jsonText);
