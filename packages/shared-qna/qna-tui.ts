@@ -47,12 +47,14 @@ function getPiTui() {
 export interface QnAOption {
 	label: string;
 	description: string;
+	recommended?: boolean;
 }
 
 export interface QnAQuestion {
 	header?: string;
 	question: string;
 	context?: string;
+	fullContext?: string;
 	options?: QnAOption[];
 }
 
@@ -262,6 +264,7 @@ export class QnATuiComponent<TQuestion extends QnAQuestion> implements Component
 	private tui: TUI;
 	private onDone: (result: QnAResult | null) => void;
 	private showingConfirmation = false;
+	private showingContextPopup = false;
 	private templates: QnATemplate[];
 	private templateIndex = 0;
 	private onResponsesChange?: (responses: QnAResponse[]) => void;
@@ -541,6 +544,28 @@ export class QnATuiComponent<TQuestion extends QnAQuestion> implements Component
 			return;
 		}
 
+		if (matchesKey(data, Key.ctrl("o"))) {
+			if (this.showingContextPopup) {
+				this.showingContextPopup = false;
+				this.invalidate();
+				this.tui.requestRender();
+			} else if (this.getCurrentQuestion().fullContext) {
+				this.showingContextPopup = true;
+				this.invalidate();
+				this.tui.requestRender();
+			}
+			return;
+		}
+
+		if (this.showingContextPopup) {
+			if (matchesKey(data, Key.escape) || matchesKey(data, Key.enter) || matchesKey(data, Key.ctrl("o"))) {
+				this.showingContextPopup = false;
+				this.invalidate();
+				this.tui.requestRender();
+			}
+			return;
+		}
+
 		if (matchesKey(data, Key.ctrl("t"))) {
 			this.applyNextTemplate();
 			return;
@@ -677,10 +702,55 @@ export class QnATuiComponent<TQuestion extends QnAQuestion> implements Component
 		lines.push(padToWidth(boxLine(progressParts.join(" "))));
 
 		if (!this.showingConfirmation) {
-			if (question.header) {
-				lines.push(padToWidth(boxLine(this.cyan(question.header))));
-			}
-			lines.push(padToWidth(emptyBoxLine()));
+			if (this.showingContextPopup && question.fullContext) {
+				lines.push(padToWidth(emptyBoxLine()));
+				lines.push(padToWidth(boxLine(this.bold(this.cyan("Question Details")))));
+				lines.push(padToWidth(emptyBoxLine()));
+
+				const wrappedFull = wrapTextWithAnsi(this.bold("Full question:"), contentWidth);
+				for (const line of wrappedFull) {
+					lines.push(padToWidth(boxLine(line)));
+				}
+				for (const line of wrapTextWithAnsi(question.fullContext, contentWidth)) {
+					lines.push(padToWidth(boxLine(line)));
+				}
+
+				if (question.context) {
+					lines.push(padToWidth(emptyBoxLine()));
+					for (const line of wrapTextWithAnsi(this.bold("Context:"), contentWidth)) {
+						lines.push(padToWidth(boxLine(line)));
+					}
+					for (const line of wrapTextWithAnsi(question.context, contentWidth)) {
+						lines.push(padToWidth(boxLine(line)));
+					}
+				}
+
+				if (options.length > 0) {
+					lines.push(padToWidth(emptyBoxLine()));
+					for (const line of wrapTextWithAnsi(this.bold("Options:"), contentWidth)) {
+						lines.push(padToWidth(boxLine(line)));
+					}
+					for (let i = 0; i < options.length; i++) {
+						const opt = options[i];
+						const optLabel = `${i + 1}. ${opt.label}`;
+						for (const line of wrapTextWithAnsi(optLabel, contentWidth)) {
+							lines.push(padToWidth(boxLine(line)));
+						}
+						if (opt.description) {
+							for (const line of wrapTextWithAnsi(this.gray(`   ${opt.description}`), contentWidth)) {
+								lines.push(padToWidth(boxLine(line)));
+							}
+						}
+					}
+				}
+
+				lines.push(padToWidth(emptyBoxLine()));
+				lines.push(padToWidth(boxLine(this.dim("Esc or Enter to close · Ctrl+O to toggle"))));
+			} else {
+				if (question.header) {
+					lines.push(padToWidth(boxLine(this.cyan(question.header))));
+				}
+				lines.push(padToWidth(emptyBoxLine()));
 
 			const wrappedQuestion = wrapTextWithAnsi(`${this.bold("Q:")} ${this.bold(question.question)}`, contentWidth);
 			for (const line of wrappedQuestion) {
@@ -698,17 +768,22 @@ export class QnATuiComponent<TQuestion extends QnAQuestion> implements Component
 				lines.push(padToWidth(emptyBoxLine()));
 				for (let i = 0; i <= options.length; i++) {
 					const isOther = i === options.length;
-					const optionLabel = isOther ? "Other" : options[i].label;
+					const rawLabel = isOther ? "Other" : options[i].label;
+					const isRecommended = !isOther && options[i].recommended;
+					const optionLabel = isRecommended ? `${rawLabel} (recommended)` : rawLabel;
 					const description = isOther ? "Type your own answer" : options[i].description;
 					const selected = response.selectedOptionIndex === i;
 					const marker = selected ? "▶" : " ";
 					const optionPrefix = `${marker} ${i + 1}. `;
 					const line = `${optionPrefix}${optionLabel}`;
-					const styledLine = selected
-						? response.selectionTouched
-							? this.green(line)
-							: this.cyan(line)
-						: line;
+					let styledLine: string;
+					if (selected) {
+						styledLine = response.selectionTouched ? this.green(line) : this.cyan(line);
+					} else if (isRecommended) {
+						styledLine = this.bold(line);
+					} else {
+						styledLine = line;
+					}
 					lines.push(padToWidth(boxLine(truncateToWidth(styledLine, contentWidth))));
 
 					if (selected && description && description.trim().length > 0) {
@@ -743,6 +818,7 @@ export class QnATuiComponent<TQuestion extends QnAQuestion> implements Component
 				lines.push(padToWidth(boxLine(`${this.bold("A:")} ${selectedLabel}`)));
 			}
 			lines.push(padToWidth(emptyBoxLine()));
+			}
 		}
 
 		if (this.showingConfirmation) {

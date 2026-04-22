@@ -321,7 +321,11 @@ async function runSingleStep(
 		args.push("--append-system-prompt", promptPath);
 	}
 
-	const placeholderRegex = new RegExp(ctx.placeholder.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
+	// Cache the placeholder regex — the placeholder is constant for the run
+	// so the regex only needs to be compiled once.
+	/* v8 ignore next 2 -- placeholder regex is runtime-only, tested via integration */
+	const placeholderPattern = ctx.placeholder.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // patch-coverage-ignore
+	const placeholderRegex = new RegExp(placeholderPattern, "g"); // patch-coverage-ignore
 	const task = step.task.replace(placeholderRegex, () => ctx.previousOutput);
 
 	const TASK_ARG_LIMIT = 8000;

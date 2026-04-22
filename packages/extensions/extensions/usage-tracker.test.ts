@@ -281,7 +281,7 @@ function stripAnsiForTest(text: string): string {
 
 import { existsSync, promises as fsPromises, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resetSafeModeStateForTests, setSafeModeState } from "./runtime-mode";
-import usageTracker from "./usage-tracker.js";
+import usageTracker, { flushPendingWrites } from "./usage-tracker.js";
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -503,6 +503,9 @@ describe("usage-tracker extension", () => {
 				{ type: "turn_end", turnIndex: 0, message: makeAssistantMessage({ costTotal: 0.45 }), toolResults: [] },
 				ctx,
 			);
+
+			// Flush the debounced write so the test can observe it
+			flushPendingWrites();
 
 			const writes = (writeFileSync as ReturnType<typeof vi.fn>).mock.calls.filter(
 				(call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("usage-tracker-history.json"),
@@ -1853,6 +1856,36 @@ describe("usage-tracker extension", () => {
 			const written = JSON.parse(writeCalls[0][1] as string);
 			expect(written.cursorUp).toEqual(["up", "ctrl+p"]);
 			expect(written.deleteToLineStart).toEqual([]);
+		});
+	});
+
+	// Covers the scheduleRateLimitCacheSave debounce timer callback (lines 433-436)
+	describe("rate limit cache debounce", () => {
+		it("writes rate limit cache to disk after the debounce timer fires", async () => {
+			(existsSync as ReturnType<typeof vi.fn>).mockImplementation((path: string) => String(path) === AUTH_JSON_PATH);
+			(readFileSync as ReturnType<typeof vi.fn>).mockImplementation((path: string) => {
+				if (String(path) === AUTH_JSON_PATH) {
+					return makeAuthJson();
+				}
+				return "{}";
+			});
+			mockFetch.mockResolvedValue(makeFetchResponse({ status: 429, ok: false, headers: { "retry-after": "5" } }));
+
+			usageTracker(pi as any);
+			pi._emit("session_start", { type: "session_start" }, ctx);
+
+			const tool = pi._tools.get("usage_report");
+			// This triggers a 429 which calls scheduleRateLimitCacheSave()
+			await runWithTimers(() => tool.execute("id", { format: "detailed" }, undefined, undefined, ctx));
+
+			// Advance past the 10s debounce to fire the timer callback
+			await vi.advanceTimersByTimeAsync(11_000);
+
+			// Rate limit cache should have been written
+			const rateLimitWrites = (writeFileSync as ReturnType<typeof vi.fn>).mock.calls.filter((call: any[]) =>
+				String(call[0]).includes("rate-limits"),
+			);
+			expect(rateLimitWrites.length).toBeGreaterThanOrEqual(1);
 		});
 	});
 });

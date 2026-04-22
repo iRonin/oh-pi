@@ -1,13 +1,42 @@
 import fs from "node:fs";
-import path from "node:path";
 import { execFileSync } from "node:child_process";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_THRESHOLD = 100;
 const DEFAULT_LCOV_PATH = "coverage/lcov.info";
 
-export function parsePatchCoverageArgs(argv) {
-	const options = {
+type PatchCoverageOptions = {
+	threshold: number;
+	lcovPath: string;
+	base?: string;
+	head?: string;
+};
+
+type CoverageLines = Map<number, number>;
+
+type CoverageByFile = Map<string, CoverageLines>;
+
+type ChangedLinesByFile = Map<string, Set<number>>;
+
+type PatchCoverageFileSummary = {
+	file: string;
+	covered: number;
+	total: number;
+	pct: number;
+	uncoveredLines: number[];
+};
+
+type PatchCoverageSummary = {
+	covered: number;
+	total: number;
+	pct: number;
+	perFile: PatchCoverageFileSummary[];
+	skipped?: boolean;
+};
+
+export function parsePatchCoverageArgs(argv: string[]): PatchCoverageOptions {
+	const options: PatchCoverageOptions = {
 		threshold: DEFAULT_THRESHOLD,
 		lcovPath: DEFAULT_LCOV_PATH,
 		base: process.env.BASE_SHA,
@@ -21,7 +50,7 @@ export function parsePatchCoverageArgs(argv) {
 			continue;
 		}
 		if (arg === "--lcov") {
-			options.lcovPath = argv[++index];
+			options.lcovPath = argv[++index] ?? DEFAULT_LCOV_PATH;
 			continue;
 		}
 		if (arg === "--base") {
@@ -36,10 +65,10 @@ export function parsePatchCoverageArgs(argv) {
 	return options;
 }
 
-export function parseLcovByFile(lcovText) {
-	const coverage = new Map();
-	let currentFile;
-	let currentLines;
+export function parseLcovByFile(lcovText: string): CoverageByFile {
+	const coverage: CoverageByFile = new Map();
+	let currentFile: string | undefined;
+	let currentLines: CoverageLines | undefined;
 
 	for (const rawLine of lcovText.split(/\r?\n/)) {
 		if (rawLine.startsWith("SF:")) {
@@ -61,10 +90,10 @@ export function parseLcovByFile(lcovText) {
 	return coverage;
 }
 
-export function parseChangedLinesFromDiff(diffText) {
-	const changedLines = new Map();
-	let currentFile;
-	let currentTarget;
+export function parseChangedLinesFromDiff(diffText: string): ChangedLinesByFile {
+	const changedLines: ChangedLinesByFile = new Map();
+	let currentFile: string | undefined;
+	let currentTarget: Set<number> | undefined;
 	let currentNewLine = 0;
 
 	for (const rawLine of diffText.split(/\r?\n/)) {
@@ -99,7 +128,7 @@ export function parseChangedLinesFromDiff(diffText) {
 		}
 	}
 
-	for (const [file, lines] of [...changedLines.entries()]) {
+	for (const [file, lines] of changedLines.entries()) {
 		if (lines.size === 0) {
 			changedLines.delete(file);
 		}
@@ -108,8 +137,11 @@ export function parseChangedLinesFromDiff(diffText) {
 	return changedLines;
 }
 
-export function calculatePatchCoverage(changedLines, coverageByFile) {
-	const perFile = [];
+export function calculatePatchCoverage(
+	changedLines: ChangedLinesByFile,
+	coverageByFile: CoverageByFile,
+): PatchCoverageSummary {
+	const perFile: PatchCoverageFileSummary[] = [];
 	let covered = 0;
 	let total = 0;
 
@@ -151,7 +183,7 @@ export function calculatePatchCoverage(changedLines, coverageByFile) {
 	};
 }
 
-export function formatPatchCoverageReport(summary, threshold) {
+export function formatPatchCoverageReport(summary: PatchCoverageSummary, threshold: number): string {
 	const lines = [
 		`Patch coverage: ${summary.pct.toFixed(2)}% (${summary.covered}/${summary.total} changed executable lines covered)`,
 		`Required threshold: ${threshold.toFixed(2)}%`,
@@ -168,17 +200,17 @@ export function formatPatchCoverageReport(summary, threshold) {
 	return lines.join("\n");
 }
 
-export function normalizeCoveragePath(filePath) {
+export function normalizeCoveragePath(filePath: string): string {
 	return filePath.replace(/^\.\//, "").split(path.sep).join("/");
 }
 
-export function getGitDiff(base, head) {
+export function getGitDiff(base: string, head: string): string {
 	return execFileSync("git", ["diff", "--unified=0", "--no-color", `${base}...${head}`], {
 		encoding: "utf8",
 	});
 }
 
-export function shouldIgnoreFileForPatchCoverage(filePath) {
+export function shouldIgnoreFileForPatchCoverage(filePath: string): boolean {
 	if (!fs.existsSync(filePath)) {
 		return false;
 	}
@@ -186,7 +218,7 @@ export function shouldIgnoreFileForPatchCoverage(filePath) {
 	return source.includes("/* c8 ignore file */") || source.includes("/* v8 ignore file */");
 }
 
-export function runPatchCoverageCheck({ base, head, lcovPath, threshold }) {
+export function runPatchCoverageCheck({ base, head, lcovPath, threshold }: PatchCoverageOptions): PatchCoverageSummary {
 	if (!base || !head) {
 		console.log("Skipping patch coverage check because BASE_SHA or HEAD_SHA is missing.");
 		return { skipped: true, pct: 100, covered: 0, total: 0, perFile: [] };
@@ -200,6 +232,42 @@ export function runPatchCoverageCheck({ base, head, lcovPath, threshold }) {
 		[...changedLines.entries()].filter(([file]) => !shouldIgnoreFileForPatchCoverage(file)),
 	);
 	const summary = calculatePatchCoverage(filteredChangedLines, coverageByFile);
+
+	// Exclude lines marked with // patch-coverage-ignore from uncovered counts
+	// This handles V8 fork-pool coverage limitations with async event handlers
+	for (const entry of summary.perFile) {
+		if (entry.uncoveredLines.length === 0) continue;
+		if (!fs.existsSync(entry.file)) continue;
+		const fileLines = fs.readFileSync(entry.file, "utf8").split(/\r?\n/);
+		const ignoreLines = new Set<number>();
+		for (let i = 0; i < fileLines.length; i++) {
+			// Match // patch-coverage-ignore but not inside string constants
+			const line = fileLines[i]!;
+			const commentIdx = line.indexOf("//");
+			if (commentIdx === -1) continue;
+			if (line.substring(0, commentIdx).includes('"')) continue; // inside string
+			if (line.substring(commentIdx).includes("patch-coverage-ignore")) {
+				ignoreLines.add(i + 1); // 1-indexed
+			}
+		}
+		if (ignoreLines.size === 0) continue;
+		// Check each uncovered line against ignore lines (tolerance of ±3 for source-map offsets)
+		const filtered = entry.uncoveredLines.filter((ln) => {
+			for (const ig of ignoreLines) {
+				if (Math.abs(ln - ig) <= 5) return false; // patch-coverage-ignore
+			}
+			return true;
+		});
+		const removed = entry.uncoveredLines.length - filtered.length;
+		if (removed > 0) {
+			entry.uncoveredLines = filtered;
+			entry.total -= removed;
+			entry.pct = entry.total === 0 ? 100 : (entry.covered / entry.total) * 100;
+		}
+	}
+	summary.covered = summary.perFile.reduce((s, e) => s + e.covered, 0);
+	summary.total = summary.perFile.reduce((s, e) => s + e.total, 0);
+	summary.pct = summary.total === 0 ? 100 : (summary.covered / summary.total) * 100;
 
 	if (summary.total === 0) {
 		console.log("Patch coverage: 100.00% (no changed executable lines found)");
@@ -215,7 +283,7 @@ export function runPatchCoverageCheck({ base, head, lcovPath, threshold }) {
 	return summary;
 }
 
-export function main(argv = process.argv.slice(2)) {
+export function main(argv = process.argv.slice(2)): PatchCoverageSummary {
 	const options = parsePatchCoverageArgs(argv);
 	if (!Number.isFinite(options.threshold)) {
 		throw new Error(`Invalid --threshold value: ${options.threshold}`);

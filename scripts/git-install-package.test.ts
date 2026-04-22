@@ -37,6 +37,7 @@ describe("git-install package manifest", () => {
 		const extensionPackages = [
 			"packages/extensions/package.json",
 			"packages/ant-colony/package.json",
+			"packages/background-tasks/package.json",
 			"packages/diagnostics/package.json",
 			"packages/subagents/package.json",
 			"packages/plan/package.json",
@@ -44,6 +45,7 @@ describe("git-install package manifest", () => {
 			"packages/web-remote/package.json",
 			"packages/cursor/package.json",
 			"packages/ollama/package.json",
+			"packages/analytics-extension/package.json",
 		];
 		const expectedExtensionEntries = extensionPackages.flatMap((packageJsonPath) => {
 			const manifest = readPackageJson(packageJsonPath);

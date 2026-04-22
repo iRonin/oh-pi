@@ -247,13 +247,19 @@ export default function usageTracker(pi: ExtensionAPI) {
 
 	function pruneRollingHistory(now = Date.now()): void {
 		const cutoff = now - ROLLING_COST_WINDOW_MS;
-		for (let i = rollingHistory.length - 1; i >= 0; i--) {
-			if (!Number.isFinite(rollingHistory[i].timestamp) || rollingHistory[i].timestamp < cutoff) {
-				rollingHistory.splice(i, 1);
+		let write = 0;
+		// biome-ignore lint/style/useForOf: C-style loop needed for write-pointer in-place filter algorithm
+		for (let read = 0; read < rollingHistory.length; read++) {
+			const entry = rollingHistory[read];
+			if (Number.isFinite(entry.timestamp) && entry.timestamp >= cutoff) {
+				rollingHistory[write++] = entry;
 			}
 		}
+		rollingHistory.length = write;
 		if (rollingHistory.length > ROLLING_HISTORY_MAX_POINTS) {
-			rollingHistory.splice(0, rollingHistory.length - ROLLING_HISTORY_MAX_POINTS);
+			const excess = rollingHistory.length - ROLLING_HISTORY_MAX_POINTS;
+			rollingHistory.copyWithin(0, excess);
+			rollingHistory.length = ROLLING_HISTORY_MAX_POINTS;
 		}
 	}
 
@@ -288,6 +294,26 @@ export default function usageTracker(pi: ExtensionAPI) {
 		} catch {
 			// Non-critical. If history cannot be read, continue with in-memory tracking.
 		}
+	}
+
+	const PERSIST_DEBOUNCE_MS = 10_000;
+	let rollingHistoryDirty = false;
+	let rollingHistorySaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+	/** Mark rolling history as dirty and schedule a debounced save. */
+	function scheduleRollingHistorySave(): void {
+		rollingHistoryDirty = true;
+		if (rollingHistorySaveTimer) {
+			return;
+		}
+		rollingHistorySaveTimer = setTimeout(() => {
+			rollingHistorySaveTimer = null;
+			if (rollingHistoryDirty) {
+				rollingHistoryDirty = false;
+				saveRollingHistory();
+			}
+		}, PERSIST_DEBOUNCE_MS);
+		rollingHistorySaveTimer.unref?.();
 	}
 
 	function saveRollingHistory(): void {
@@ -394,15 +420,32 @@ export default function usageTracker(pi: ExtensionAPI) {
 		}
 	}
 
+	let rateLimitCacheDirty = false;
+	let rateLimitCacheSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+	/** Mark rate limit cache as dirty and schedule a debounced save. */
+	function scheduleRateLimitCacheSave(): void {
+		rateLimitCacheDirty = true;
+		if (rateLimitCacheSaveTimer) {
+			return;
+		}
+		rateLimitCacheSaveTimer = setTimeout(() => {
+			rateLimitCacheSaveTimer = null;
+			if (rateLimitCacheDirty) {
+				rateLimitCacheDirty = false;
+				saveRateLimitCache();
+			}
+		}, PERSIST_DEBOUNCE_MS);
+		rateLimitCacheSaveTimer.unref?.();
+	}
+
 	function saveRateLimitCache(): void {
 		try {
 			const dir = dirname(rateLimitCachePath);
 			if (!existsSync(dir)) {
 				mkdirSync(dir, { recursive: true });
 			}
-			const providers = Object.fromEntries(
-				Array.from(rateLimits.entries()).map(([provider, value]) => [provider, value]),
-			);
+			const providers = Object.fromEntries(rateLimits);
 			writeFileSync(rateLimitCachePath, `${JSON.stringify({ version: 1, providers }, null, 2)}\n`, "utf-8");
 		} catch {
 			// Non-critical. We can still rely on in-memory provider data.
@@ -497,6 +540,11 @@ export default function usageTracker(pi: ExtensionAPI) {
 		}
 	}
 
+	const ANTHROPIC_MODEL_RE = /claude|sonnet|opus|haiku/;
+	const OPENAI_MODEL_RE = /gpt|o1|o3|o4|codex/;
+	const GOOGLE_MODEL_RE = /gemini|flash|pro-exp|antigravity/;
+	const OLLAMA_MODEL_RE = /ollama/;
+
 	function inferProviderFromModel(model: { id?: unknown; provider?: unknown } | null | undefined): ProviderKey | null {
 		const explicitProvider = normalizeProviderKey(model?.provider);
 		if (explicitProvider) {
@@ -508,23 +556,32 @@ export default function usageTracker(pi: ExtensionAPI) {
 			return null;
 		}
 
-		if (id.includes("claude") || id.includes("sonnet") || id.includes("opus") || id.includes("haiku")) {
+		if (ANTHROPIC_MODEL_RE.test(id)) {
 			return "anthropic";
 		}
 
-		if (id.includes("gpt") || id.includes("o1") || id.includes("o3") || id.includes("o4") || id.includes("codex")) {
+		if (OPENAI_MODEL_RE.test(id)) {
 			return "openai";
 		}
 
-		if (id.includes("gemini") || id.includes("flash") || id.includes("pro-exp") || id.includes("antigravity")) {
+		if (GOOGLE_MODEL_RE.test(id)) {
 			return "google";
 		}
 
-		if (id.includes("ollama")) {
+		if (OLLAMA_MODEL_RE.test(id)) {
 			return "ollama";
 		}
 
 		return null;
+	}
+
+	function hasOllamaModel(models: Map<string, ModelUsage>): boolean {
+		for (const model of models.values()) {
+			if (normalizeProviderKey(model.provider) === "ollama") {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	function getActiveProvider(ctx: ExtensionContext | null | undefined = activeCtx): ProviderKey | null {
@@ -536,19 +593,29 @@ export default function usageTracker(pi: ExtensionAPI) {
 	}
 
 	function getModelUsageEntries(provider: ProviderKey | null = null): ModelUsage[] {
-		const entries = [...models.values()];
 		if (!provider) {
-			return entries;
+			return [...models.values()];
 		}
-		return entries.filter((entry) => normalizeProviderKey(entry.provider) === provider);
+		const result: ModelUsage[] = [];
+		for (const entry of models.values()) {
+			if (normalizeProviderKey(entry.provider) === provider) {
+				result.push(entry);
+			}
+		}
+		return result;
 	}
 
 	function getRateLimitEntries(provider: ProviderKey | null = null): ProviderRateLimits[] {
-		const entries = [...rateLimits.values()];
 		if (!provider) {
-			return entries;
+			return [...rateLimits.values()];
 		}
-		return entries.filter((entry) => entry.provider === provider);
+		const result: ProviderRateLimits[] = [];
+		for (const entry of rateLimits.values()) {
+			if (entry.provider === provider) {
+				result.push(entry);
+			}
+		}
+		return result;
 	}
 
 	function getTotals(provider: ProviderKey | null = null) {
@@ -780,7 +847,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 		if (options.persist !== false && Number.isFinite(cost) && cost >= 0) {
 			rollingHistory.push({ timestamp: now, cost });
 			pruneRollingHistory(now);
-			saveRollingHistory();
+			scheduleRollingHistorySave();
 		}
 
 		requestUsageWidgetRender();
@@ -888,6 +955,17 @@ export default function usageTracker(pi: ExtensionAPI) {
 		turnHistory.length = 0;
 		lastThresholdIndex = -1;
 		sessionStart = Date.now();
+		// Flush any pending persisted state before clearing.
+		if (rollingHistorySaveTimer) {
+			clearTimeout(rollingHistorySaveTimer);
+			rollingHistorySaveTimer = null;
+		}
+		if (rateLimitCacheSaveTimer) {
+			clearTimeout(rateLimitCacheSaveTimer);
+			rateLimitCacheSaveTimer = null;
+		}
+		rollingHistoryDirty = false;
+		rateLimitCacheDirty = false;
 	}
 
 	function hydrateFromSessionEntries(entries: ReturnType<ExtensionContext["sessionManager"]["getBranch"]>): void {
@@ -955,7 +1033,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 						: null;
 				const limits = await probeOllamaDirect(fresh?.token ?? null);
 				rateLimits.set(provider, limits);
-				saveRateLimitCache();
+				scheduleRateLimitCacheSave();
 				lastProbeTime.set(provider, Date.now());
 				requestUsageWidgetRender();
 				return;
@@ -984,7 +1062,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 					probedAt: now,
 					error: null,
 				});
-				saveRateLimitCache();
+				scheduleRateLimitCacheSave();
 				lastProbeTime.set(provider, now);
 				requestUsageWidgetRender();
 				return;
@@ -1003,7 +1081,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 					probedAt: now,
 					error: `${providerDisplayName(provider)} token refresh failed — re-authenticate with pi login.`,
 				});
-				saveRateLimitCache();
+				scheduleRateLimitCacheSave();
 				lastProbeTime.set(provider, now);
 				requestUsageWidgetRender();
 				return;
@@ -1034,7 +1112,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 			}
 
 			rateLimits.set(provider, limits);
-			saveRateLimitCache();
+			scheduleRateLimitCacheSave();
 			lastProbeTime.set(provider, Date.now());
 			requestUsageWidgetRender();
 		} catch {
@@ -1077,7 +1155,7 @@ export default function usageTracker(pi: ExtensionAPI) {
 				process.env.OLLAMA_API_KEY?.trim() || process.env.OLLAMA_HOST?.trim() || process.env.OLLAMA_HOST_CLOUD?.trim(),
 			) ||
 			activeProvider === "ollama" ||
-			[...models.values()].some((model) => normalizeProviderKey(model.provider) === "ollama");
+			hasOllamaModel(models);
 		if (shouldProbeOllama && !seen.has("ollama")) {
 			seen.add("ollama");
 			probeProvider("ollama", force);
@@ -1351,9 +1429,14 @@ export default function usageTracker(pi: ExtensionAPI) {
 		if (!provider) {
 			const externalSources = getExternalSources();
 			if (externalSources.length > 0) {
-				const externalTotalCost = externalSources.reduce((sum, source) => sum + source.costTotal, 0);
-				const externalTurns = externalSources.reduce((sum, source) => sum + source.turns, 0);
-				const externalTokens = externalSources.reduce((sum, source) => sum + source.input + source.output, 0);
+				let externalTotalCost = 0;
+				let externalTurns = 0;
+				let externalTokens = 0;
+				for (const source of externalSources) {
+					externalTotalCost += source.costTotal;
+					externalTurns += source.turns;
+					externalTokens += source.input + source.output;
+				}
 				lines.push(
 					`External inference: ${fmtCost(externalTotalCost)} across ${externalTurns} turns (${fmtTokens(externalTokens)} tokens)`,
 				);
@@ -1478,9 +1561,14 @@ export default function usageTracker(pi: ExtensionAPI) {
 		if (!provider) {
 			const externalSources = getExternalSources();
 			if (externalSources.length > 0) {
-				const externalTotalCost = externalSources.reduce((sum, source) => sum + source.costTotal, 0);
-				const externalTurns = externalSources.reduce((sum, source) => sum + source.turns, 0);
-				const externalTokens = externalSources.reduce((sum, source) => sum + source.input + source.output, 0);
+				let externalTotalCost = 0;
+				let externalTurns = 0;
+				let externalTokens = 0;
+				for (const source of externalSources) {
+					externalTotalCost += source.costTotal;
+					externalTurns += source.turns;
+					externalTokens += source.input + source.output;
+				}
 				lines.push(
 					`  ${theme.fg("accent", "External")}${sep}${theme.fg("warning", fmtCost(externalTotalCost))}${sep}${externalTurns} turns${sep}${fmtTokens(externalTokens)} tokens`,
 				);
@@ -1741,4 +1829,34 @@ export default function usageTracker(pi: ExtensionAPI) {
 			await openUsageOverlay(ctx, provider);
 		},
 	});
+
+	// Wire up test-only flush function
+	flushPendingWritesFn = () => {
+		if (rollingHistorySaveTimer) {
+			clearTimeout(rollingHistorySaveTimer);
+			rollingHistorySaveTimer = null;
+		}
+		if (rollingHistoryDirty) {
+			rollingHistoryDirty = false;
+			saveRollingHistory();
+		}
+		if (rateLimitCacheSaveTimer) {
+			clearTimeout(rateLimitCacheSaveTimer);
+			rateLimitCacheSaveTimer = null;
+		}
+		if (rateLimitCacheDirty) {
+			rateLimitCacheDirty = false;
+			saveRateLimitCache();
+		}
+	};
+}
+
+// Module-level flush function — set by usageTracker() for test access.
+let flushPendingWritesFn: (() => void) | null = null;
+
+/** Flush any pending debounced writes to disk. For use in tests only. */
+export function flushPendingWrites(): void {
+	if (flushPendingWritesFn) {
+		flushPendingWritesFn();
+	}
 }
