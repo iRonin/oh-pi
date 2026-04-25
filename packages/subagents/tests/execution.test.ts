@@ -95,6 +95,7 @@ vi.mock("../artifacts.js", () => ({
 }));
 vi.mock("../types.js", () => ({
 	DEFAULT_MAX_OUTPUT: { bytes: 200 * 1024, lines: 5000 },
+	DEFAULT_IDLE_TIMEOUT_MS: 15 * 60 * 1000,
 	truncateOutput: executionMocks.truncateOutput,
 	getSubagentDepthEnv: executionMocks.getSubagentDepthEnv,
 }));
