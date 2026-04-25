@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { discoverAgents } from "./agents.js";
-import { MAX_PARALLEL } from "./types.js";
+import { resolveSubagentLimits } from "./types.js";
 
 interface InlineConfig {
 	output?: string | false;
@@ -271,7 +271,9 @@ export function registerSubagentCommands(pi: ExtensionAPI, options: RegisterSuba
 				return;
 			}
 			if (parsed.steps.length > MAX_PARALLEL) {
-				ctx.ui.notify(`Max ${MAX_PARALLEL} parallel tasks`, "error");
+				const limits = resolveSubagentLimits(ctx.cwd);
+				if (parsed.steps.length > limits.maxParallel) {
+					ctx.ui.notify(`Max ${limits.maxParallel} parallel tasks`, "error");
 				return;
 			}
 			const tasks = parsed.steps.map(({ name, config, task: stepTask }) => ({
