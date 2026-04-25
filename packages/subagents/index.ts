@@ -562,7 +562,6 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 				const behaviors = agentConfigs.map((c) => resolveStepBehavior(c, {}));
 				const liveResults: (SingleResult | undefined)[] = new Array(params.tasks.length).fill(undefined);
 				const liveProgress: (AgentProgress | undefined)[] = new Array(params.tasks.length).fill(undefined);
-				const limits = resolveSubagentLimits(ctx.cwd);
 				const results = await mapConcurrent(params.tasks, limits.maxConcurrency, async (t, i) => {
 					const overrideSkills = skillOverrides[i];
 					const effectiveSkills = overrideSkills === undefined ? behaviors[i]?.skills : overrideSkills;
