@@ -63,6 +63,25 @@ import { resolveSubagentModelResolution, toAvailableModelRefs } from "./model-ro
 
 const STARTUP_CLEANUP_DELAY_MS = 250;
 
+/**
+ * Build a collapsible call-params block injected into tool result text.
+ * Wrapped in an HTML comment so the LLM ignores it; the TUI strips comments.
+ */
+function buildCallDetailBlock(params: Record<string, unknown>): string {
+	try {
+		const json = JSON.stringify(params, (_k, v) => (typeof v === "function" ? "[function]" : v), 2);
+		return `
+<!--
+<subagent-call-params>
+${json}
+</subagent-call-params>
+-->
+`;
+	} catch {
+		return "";
+	}
+}
+
 // ExtensionConfig is now imported from ./types.js
 
 export default function registerSubagentExtension(pi: ExtensionAPI): void {
