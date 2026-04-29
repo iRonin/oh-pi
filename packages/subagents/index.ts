@@ -455,10 +455,19 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 				// Validate all agents exist
 				const agentConfigs: AgentConfig[] = [];
 				for (const t of params.tasks) {
-					const config = agents.find((a) => a.name === t.agent);
+					let config = agents.find((a) => a.name === t.agent);
 					if (!config) {
+						// Try prefix match for helpful error
+						const matches = agents.filter((a) => a.name.startsWith(t.agent));
+						const hint = matches.length === 1
+							? `\n\nDid you mean: **${matches[0].name}**?`
+							: matches.length > 1
+								? `\n\nPossible matches: ${matches.map(m => m.name).join(", ")}`
+								: agents.length > 0
+									? `\n\nAvailable project agents: ${agents.filter(a => a.source === 'project').map(a => a.name).join(", ") || "(none — check .pi/agents/)"}`
+									: "";
 						return {
-							content: [{ type: "text", text: `Unknown agent: ${t.agent}` }],
+							content: [{ type: "text", text: `Unknown agent: **${t.agent}**${hint}` }],
 							isError: true,
 							details: { mode: "parallel" as const, results: [] },
 						};
