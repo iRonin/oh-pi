@@ -126,6 +126,8 @@ export interface Details {
 	chainAgents?: string[]; // Agent names in order, e.g., ["scout", "planner"]
 	totalSteps?: number; // Total steps in chain
 	currentStepIndex?: number; // 0-indexed current step (for running chains)
+	// Call params for observability (model, cwd, skills)
+	callParams?: Record<string, unknown>;
 }
 
 // ============================================================================

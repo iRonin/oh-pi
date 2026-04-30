@@ -69,6 +69,25 @@ import { findByPrefix, getFinalOutput, mapConcurrent, readStatus } from "./utils
 const STARTUP_CLEANUP_DELAY_MS = 250;
 
 /**
+ * Build a collapsible call-params block injected into tool result text.
+ * Wrapped in an HTML comment so the LLM ignores it; the TUI strips comments.
+ */
+function buildCallDetailBlock(params: Record<string, unknown>): string {
+	try {
+		const json = JSON.stringify(params, (_k, v) => (typeof v === "function" ? "[function]" : v), 2);
+		return `
+<!--
+<subagent-call-params>
+${json}
+</subagent-call-params>
+-->
+`;
+	} catch {
+		return "";
+	}
+}
+
+/**
  * Resolve an agent by name with fallback to external configs and inline creation.
  *
  * Search order:
@@ -821,7 +840,8 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 					.join("\n\n");
 
 				const summary = `${ok}/${results.length} succeeded${downgradeNote}`;
-				const fullContent = `${summary}\n\n${aggregatedOutput}`;
+				const callDetail = buildCallDetailBlock(params);
+				const fullContent = `${summary}\n\n${aggregatedOutput}${callDetail}`;
 
 				return {
 					content: [{ type: "text", text: fullContent }],
@@ -830,6 +850,7 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 						results,
 						progress: params.includeProgress ? allProgress : undefined,
 						artifacts: allArtifactPaths.length ? { dir: artifactsDir, files: allArtifactPaths } : undefined,
+						callParams: { ...params },
 					},
 				};
 			}
@@ -1011,6 +1032,7 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 							progress: params.includeProgress ? allProgress : undefined,
 							artifacts: allArtifactPaths.length ? { dir: artifactsDir, files: allArtifactPaths } : undefined,
 							truncation: r.truncation,
+							callParams: { ...params },
 						},
 						isError: true,
 					};
@@ -1028,6 +1050,7 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 						progress: params.includeProgress ? allProgress : undefined,
 						artifacts: allArtifactPaths.length ? { dir: artifactsDir, files: allArtifactPaths } : undefined,
 						truncation: r.truncation,
+						callParams: { ...params },
 					},
 				};
 			}
