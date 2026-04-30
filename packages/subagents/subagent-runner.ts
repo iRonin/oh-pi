@@ -6,7 +6,7 @@ import * as path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { RunnerStep, RunnerSubagentStep as SubagentStep } from "./parallel-utils.js";
-import type { ArtifactConfig, ArtifactPaths, MaxOutputConfig } from "./types.js";
+import type { ArtifactConfig, ArtifactPaths, MaxOutputConfig, SteerMessage } from "./types.js";
 
 import { appendJsonl, getArtifactPaths } from "./artifacts.js";
 import {
@@ -18,6 +18,7 @@ import {
 } from "./parallel-utils.js";
 import { getPiSpawnCommand } from "./pi-spawn.js";
 import { persistSingleOutput } from "./single-output.js";
+import { drainSteerMailbox, steerMailboxPath } from "./utils.js";
 import { DEFAULT_MAX_OUTPUT, getSubagentDepthEnv, truncateOutput } from "./types.js";
 
 /**
@@ -534,6 +535,7 @@ async function runSubagent(config: SubagentRunConfig): Promise<void> {
 		gistUrl?: string;
 		shareError?: string;
 		error?: string;
+		steerCount?: number;
 	} = {
 		artifactsDir,
 		currentStep: 0,
@@ -551,6 +553,7 @@ async function runSubagent(config: SubagentRunConfig): Promise<void> {
 			status: "pending",
 			skills: step.skills,
 		})),
+		steerCount: 0,
 	};
 
 	fs.mkdirSync(asyncDir, { recursive: true });
@@ -569,6 +572,60 @@ async function runSubagent(config: SubagentRunConfig): Promise<void> {
 
 	// Track the flat index into statusPayload.steps across sequential + parallel steps
 	let flatIndex = 0;
+	let cancelled = false;
+
+	/**
+	 * Poll the steering mailbox between steps.
+	 * Drains messages and appends follow-up steps to the queue.
+	 * Sets `cancelled = true` if a cancel message is received.
+	 */
+	const pollSteerMailbox = () => {
+		const msgs = drainSteerMailbox(asyncDir);
+		if (msgs.length === 0) return;
+
+		for (const msg of msgs) {
+			statusPayload.steerCount = (statusPayload.steerCount ?? 0) + 1;
+			if (msg.type === "cancel") {
+				cancelled = true;
+				appendJsonl(
+					eventsPath,
+					JSON.stringify({
+						type: "subagent.steer.cancel",
+						ts: msg.ts,
+						runId: id,
+					}),
+				);
+			} else {
+				// follow-up or direction — append as new step
+				const newStep: SubagentStep = {
+					agent: steps[stepIndex] && !isParallelGroup(steps[stepIndex])
+						? (steps[stepIndex] as SubagentStep).agent
+						: (flatSteps.at(-1)?.agent ?? "assistant"),
+					task: msg.text,
+				};
+				const newFlatIndex = statusPayload.steps.length;
+				steps.push(newStep);
+				statusPayload.steps.push({
+					agent: newStep.agent,
+					status: "pending",
+					skills: newStep.skills,
+				});
+				appendJsonl(
+					eventsPath,
+					JSON.stringify({
+						type: "subagent.steer.followup",
+						ts: msg.ts,
+						runId: id,
+						stepIndex: newFlatIndex,
+						agent: newStep.agent,
+						text: msg.text.slice(0, 200),
+					}),
+				);
+			}
+		}
+		statusPayload.lastUpdate = Date.now();
+		writeJson(statusPath, statusPayload);
+	};
 
 	for (let stepIndex = 0; stepIndex < steps.length; stepIndex++) {
 		const step = steps[stepIndex];
@@ -735,6 +792,10 @@ async function runSubagent(config: SubagentRunConfig): Promise<void> {
 			if (parallelResults.some((r) => r.exitCode !== 0 && r.exitCode !== -1)) {
 				break;
 			}
+
+			// Check for steering messages between parallel groups
+			pollSteerMailbox();
+			if (cancelled) break;
 		} else {
 			// === SEQUENTIAL STEP ===
 			const seqStep = step as SubagentStep;
@@ -823,6 +884,10 @@ async function runSubagent(config: SubagentRunConfig): Promise<void> {
 			if (singleResult.exitCode !== 0) {
 				break;
 			}
+
+			// Check for steering messages between sequential steps
+			pollSteerMailbox();
+			if (cancelled) break;
 		}
 	}
 

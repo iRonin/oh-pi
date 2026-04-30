@@ -239,3 +239,8 @@ export const StatusParams = Type.Object({
 	dir: Type.Optional(Type.String({ description: "Async run directory (overrides id search)" })),
 	id: Type.Optional(Type.String({ description: "Async run id or prefix" })),
 });
+
+export const SteerParams = Type.Object({
+	id: Type.String({ description: "Async run ID or prefix to steer" }),
+	message: Type.String({ description: "Follow-up message to send to the running subagent" }),
+});

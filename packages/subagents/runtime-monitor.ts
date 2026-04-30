@@ -76,6 +76,7 @@ export function createSubagentRuntimeMonitor(options: RuntimeMonitorOptions) {
 					job.outputFile = status.outputFile ?? job.outputFile;
 					job.totalTokens = status.totalTokens ?? job.totalTokens;
 					job.sessionFile = status.sessionFile ?? job.sessionFile;
+					job.pendingSteers = status.steerCount ?? 0;
 				} else {
 					job.status = job.status === "queued" ? "running" : job.status;
 					job.updatedAt = Date.now();

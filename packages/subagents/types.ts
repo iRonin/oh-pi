@@ -189,6 +189,8 @@ export interface AsyncJobState {
 	outputFile?: string;
 	totalTokens?: TokenUsage;
 	sessionFile?: string;
+	/** Number of steer messages received for this job */
+	pendingSteers?: number;
 }
 
 // ============================================================================

@@ -8,7 +8,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import type { AsyncStatus, DisplayItem, ErrorInfo } from "./types.js";
+import type { AsyncStatus, DisplayItem, ErrorInfo, SteerMailbox, SteerMessage } from "./types.js";
 
 // ============================================================================
 // File System Utilities
@@ -406,4 +406,73 @@ export async function mapConcurrent<T, R>(
 	const workers = Array.from({ length: Math.min(safeLimit, items.length) }, (_, wi) => worker(wi));
 	await Promise.all(workers);
 	return results;
+}
+
+// ============================================================================
+// Steering Mailbox Utilities
+// ============================================================================
+
+/** Path to the steering mailbox file for a given async run */
+export function steerMailboxPath(asyncDir: string): string {
+	return path.join(asyncDir, "steer.json");
+}
+
+/**
+ * Read all pending steer messages from the mailbox.
+ * Returns empty array if file doesn't exist or is unreadable.
+ */
+export function readSteerMailbox(asyncDir: string): SteerMessage[] {
+	const mailboxPath = steerMailboxPath(asyncDir);
+	try {
+		const raw = fs.readFileSync(mailboxPath, "utf-8");
+		const mailbox: SteerMailbox = JSON.parse(raw);
+		return mailbox.messages ?? [];
+	} catch {
+		return [];
+	}
+}
+
+/**
+ * Append a steer message to the mailbox.
+ * Uses a write-lock pattern: reads existing, appends, writes back atomically.
+ */
+export function writeSteerMessage(asyncDir: string, msg: SteerMessage): void {
+	const mailboxPath = steerMailboxPath(asyncDir);
+	let existing: SteerMessage[] = [];
+	try {
+		const raw = fs.readFileSync(mailboxPath, "utf-8");
+		const mailbox: SteerMailbox = JSON.parse(raw);
+		existing = mailbox.messages ?? [];
+	} catch {
+		// File doesn't exist or is corrupt — start fresh
+	}
+
+	// Deduplicate by id
+	if (existing.some((m) => m.id === msg.id)) return;
+
+	existing.push(msg);
+	fs.writeFileSync(mailboxPath, JSON.stringify({ messages: existing }), { mode: 0o644 });
+}
+
+/**
+ * Drain all pending steer messages from the mailbox and return them.
+ * After this call, the mailbox is empty (file is deleted).
+ */
+export function drainSteerMailbox(asyncDir: string): SteerMessage[] {
+	const mailboxPath = steerMailboxPath(asyncDir);
+	try {
+		const raw = fs.readFileSync(mailboxPath, "utf-8");
+		const mailbox: SteerMailbox = JSON.parse(raw);
+		const msgs = mailbox.messages ?? [];
+		if (msgs.length > 0) {
+			try {
+				fs.unlinkSync(mailboxPath);
+			} catch {
+				// File already deleted
+			}
+		}
+		return msgs;
+	} catch {
+		return [];
+	}
 }

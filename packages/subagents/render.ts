@@ -104,7 +104,10 @@ let lastWidgetHash = "";
 function computeWidgetHash(jobs: AsyncJobState[]): string {
 	return jobs
 		.slice(0, MAX_WIDGET_JOBS)
-		.map((job) => `${job.asyncId}:${job.status}:${job.currentStep}:${job.updatedAt}:${job.totalTokens?.total ?? 0}`)
+		.map(
+			(job) =>
+				`${job.asyncId}:${job.status}:${job.currentStep}:${job.updatedAt}:${job.totalTokens?.total ?? 0}:${job.pendingSteers ?? 0}`,
+		)
 		.join("|");
 }
 
@@ -185,9 +188,11 @@ export function renderWidget(
 		const activityText = job.status === "running" ? getLastActivity(job.outputFile) : "";
 		const activitySuffix = activityText ? ` | ${theme.fg("dim", activityText)}` : "";
 
+		const steerSuffix = job.pendingSteers ? ` | ${theme.fg("accent", `📩 ${job.pendingSteers} pending`)}` : "";
+
 		lines.push(
 			truncLine(
-				`- ${id} ${status} | ${agentLabel} | ${stepText}${elapsed ? ` | ${elapsed}` : ""}${tokenText}${activitySuffix}`,
+				`- ${id} ${status} | ${agentLabel} | ${stepText}${elapsed ? ` | ${elapsed}` : ""}${tokenText}${activitySuffix}${steerSuffix}`,
 				w,
 			),
 		);

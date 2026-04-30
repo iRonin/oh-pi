@@ -64,7 +64,7 @@ import {
 	RESULTS_DIR,
 	WIDGET_KEY,
 } from "./types.js";
-import { findByPrefix, getFinalOutput, mapConcurrent, readStatus } from "./utils.js";
+import { findByPrefix, getFinalOutput, mapConcurrent, readStatus, writeSteerMessage } from "./utils.js";
 
 const STARTUP_CLEANUP_DELAY_MS = 250;
 
@@ -185,6 +185,67 @@ function resolveAgentWithFallback(
 	return undefined;
 }
 
+/**
+ * Handle the "steer" action — send a follow-up message to a running async subagent.
+ * Writes the message to the async run's steering mailbox, which the runner
+ * picks up between steps.
+ */
+function handleSteerAction(
+	params: { id: string; message: string },
+	ctx: { cwd: string; hasUI?: boolean },
+): { content: Array<{ type: "text"; text: string }>; details: { mode: "management"; results: [] }; isError?: boolean } {
+	const { id, message } = params;
+
+	// Resolve the async run directory by ID prefix
+	let asyncDir: string | null = null;
+	if (id.includes("/") || id.startsWith(".")) {
+		const direct = expandTildePath(id);
+		if (fs.existsSync(path.join(direct, "status.json"))) {
+			asyncDir = direct;
+		}
+	} else {
+		for (const entry of fs.readdirSync(ASYNC_DIR)) {
+			if (entry.startsWith(id) && fs.existsSync(path.join(ASYNC_DIR, entry, "status.json"))) {
+				asyncDir = path.join(ASYNC_DIR, entry);
+				break;
+			}
+		}
+	}
+
+	if (!asyncDir) {
+		return {
+			content: [{ type: "text", text: `Async run not found: ${id}` }],
+			isError: true,
+			details: { mode: "management" as const, results: [] },
+		};
+	}
+
+	// Check if the run is still active
+	const status = readStatus(asyncDir);
+	if (status?.state === "complete" || status?.state === "failed") {
+		return {
+			content: [{ type: "text", text: `Async run ${id.slice(0, 6)} is ${status.state} — cannot steer completed runs` }],
+			isError: true,
+			details: { mode: "management" as const, results: [] },
+		};
+	}
+
+	// Write the steer message
+	const steerId = `steer-${Date.now()}`;
+	writeSteerMessage(asyncDir, {
+		id: steerId,
+		type: "follow-up",
+		text: message,
+		ts: Date.now(),
+	});
+
+	const count = (status?.steerCount ?? 0) + 1;
+	return {
+		content: [{ type: "text", text: `📩 Steer message queued for ${id.slice(0, 6)} (message #${count})` }],
+		details: { mode: "management" as const, results: [] },
+	};
+}
+
 export default function registerSubagentExtension(pi: ExtensionAPI): void {
 	ensureAccessibleDir(RESULTS_DIR);
 	ensureAccessibleDir(ASYNC_DIR);
@@ -257,7 +318,7 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 			const config = getConfig();
 			const asyncByDefault = config.asyncByDefault === true;
 			if (params.action) {
-				const validActions = ["list", "get", "create", "update", "delete"];
+				const validActions = ["list", "get", "create", "update", "delete", "steer"];
 				if (!validActions.includes(params.action)) {
 					return {
 						content: [
@@ -269,6 +330,9 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 						isError: true,
 						details: { mode: "management" as const, results: [] },
 					};
+				}
+				if (params.action === "steer") {
+					return handleSteerAction(params, ctx);
 				}
 				return handleManagementAction(params.action, params, ctx);
 			}
