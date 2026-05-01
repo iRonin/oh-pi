@@ -37,7 +37,7 @@ const KNOWN_BUILTIN_TOOLS = new Set(["read", "bash", "edit", "write", "grep", "f
  * — because these tools aren't published to npm.
  */
 const KNOWN_CUSTOM_TOOLS: Record<string, string> = {
-	read_full: "../../../pi-less-shitty/packages/read-full",
+	read_full: "npm:@ironin/pi-less-shitty#packages/read-full",
 };
 
 interface SubagentRunConfig {

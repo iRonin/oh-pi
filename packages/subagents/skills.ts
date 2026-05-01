@@ -8,6 +8,7 @@ import { expandHomeDir } from "@ifi/oh-pi-core";
 import { DefaultPackageManager, loadSkills, SettingsManager } from "@mariozechner/pi-coding-agent";
 import { execSync } from "node:child_process";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 
 import { resolveAgentDir } from "./paths.js";
@@ -221,7 +222,24 @@ function collectSettingsSkillPaths(cwd: string): string[] {
 }
 
 function buildSkillPaths(cwd: string): string[] {
-	const defaultSkillPaths = [path.join(cwd, CONFIG_DIR, "skills"), path.join(AGENT_DIR, "skills")];
+	const defaultSkillPaths: string[] = [path.join(cwd, CONFIG_DIR, "skills"), path.join(AGENT_DIR, "skills")];
+
+	// Walk up ancestor directories collecting .pi/skills/ at every level
+	// (cascading skill discovery — matches cascading-skills extension behavior)
+	let dir = cwd;
+	const home = os.homedir();
+	while (dir && dir !== home) {
+		const parent = path.dirname(dir);
+		if (parent === dir) break;
+		const ancestorSkills = path.join(parent, CONFIG_DIR, "skills");
+		try {
+			if (fs.existsSync(ancestorSkills)) {
+				defaultSkillPaths.push(ancestorSkills);
+			}
+		} catch {}
+		dir = parent;
+	}
+
 	const packagePaths = collectPackageSkillPaths(cwd);
 	const settingsPaths = collectSettingsSkillPaths(cwd);
 	return [...new Set([...defaultSkillPaths, ...packagePaths, ...settingsPaths])];
@@ -537,19 +555,32 @@ export function normalizeSkillInput(input: string | string[] | boolean | undefin
 	];
 }
 
-export function discoverAvailableSkills(cwd: string): {
+export function discoverAvailableSkills(
+	cwd: string,
+	extraCwds?: string[],
+): {
 	name: string;
 	source: SkillSource;
 	description?: string;
 }[] {
-	const skills = getCachedSkills(cwd);
-	return skills
-		.map((s) => ({
-			description: s.description,
-			name: s.name,
-			source: s.source,
-		}))
-		.toSorted((a, b) => a.name.localeCompare(b.name));
+	const allCwds = [cwd, ...(extraCwds ?? [])];
+	const seen = new Map<string, { name: string; source: SkillSource; description?: string }>();
+
+	for (const c of allCwds) {
+		const skills = getCachedSkills(c);
+		for (const s of skills) {
+			const key = s.name;
+			if (!seen.has(key)) {
+				seen.set(key, {
+					description: s.description,
+					name: s.name,
+					source: s.source,
+				});
+			}
+		}
+	}
+
+	return [...seen.values()].toSorted((a, b) => a.name.localeCompare(b.name));
 }
 
 export function clearSkillCache(): void {

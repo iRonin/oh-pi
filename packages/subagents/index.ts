@@ -17,6 +17,7 @@ import type { ExtensionAPI, ExtensionContext, ToolDefinition } from "@mariozechn
 import { Text } from "@mariozechner/pi-tui";
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 
 import type { ManagerResult } from "./agent-manager.js";
@@ -183,6 +184,22 @@ function resolveAgentWithFallback(
 	}
 
 	return undefined;
+}
+
+/**
+ * Walk up from a directory looking for .pi/skills/.
+ * Returns the nearest ancestor with skills, or null.
+ */
+function findAgentSkillRoot(startDir: string): string | null {
+	let dir = startDir;
+	const home = os.homedir();
+	while (dir && dir !== home) {
+		const parent = path.dirname(dir);
+		if (parent === dir) break;
+		if (fs.existsSync(path.join(dir, ".pi", "skills"))) return dir;
+		dir = parent;
+	}
+	return null;
 }
 
 /**
@@ -735,7 +752,26 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 
 					// Resolve behaviors with task-level skill overrides for TUI display
 					const behaviors = agentConfigs.map((c, i) => resolveStepBehavior(c, { skills: skillOverrides[i] }));
-					const availableSkills = discoverAvailableSkills(ctx.cwd);
+					// Discover skills from agent file directories too (so legal agents find legal skills)
+					const agentSkillRoots = [
+						...new Set(
+							agentConfigs
+								.map((c) => c.filePath)
+								.filter(Boolean)
+								.map((fp) => {
+									let dir = path.dirname(fp);
+									while (dir && dir !== os.homedir()) {
+										const parent = path.dirname(dir);
+										if (parent === dir) break;
+										if (fs.existsSync(path.join(dir, ".pi", "skills"))) return dir;
+										dir = parent;
+									}
+									return null;
+								})
+								.filter(Boolean) as string[],
+						),
+					];
+					const availableSkills = discoverAvailableSkills(ctx.cwd, agentSkillRoots);
 
 					const result = await ctx.ui.custom<ChainClarifyResult>(
 						(tui, theme, _kb, done) =>
@@ -969,7 +1005,10 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 						output: effectiveOutput,
 						skills: skillOverride,
 					});
-					const availableSkills = discoverAvailableSkills(ctx.cwd);
+					const agentSkillRoot = agentConfig.filePath
+						? findAgentSkillRoot(path.dirname(agentConfig.filePath))
+						: null;
+					const availableSkills = discoverAvailableSkills(ctx.cwd, agentSkillRoot ? [agentSkillRoot] : []);
 
 					const result = await ctx.ui.custom<ChainClarifyResult>(
 						(tui, theme, _kb, done) =>
