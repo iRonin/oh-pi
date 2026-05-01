@@ -28,14 +28,16 @@ import { DEFAULT_MAX_OUTPUT, getSubagentDepthEnv, truncateOutput } from "./types
 const KNOWN_BUILTIN_TOOLS = new Set(["read", "bash", "edit", "write", "grep", "find", "ls", "subagent"]);
 
 /**
- * Known custom tool names mapped to their npm package or extension path.
+ * Known custom tool names mapped to their extension path.
  * When a tool name matches here but isn't a builtin, the runner injects
  * the corresponding --extension flag so the tool is registered at runtime.
  *
  * Add entries here when agents reference custom tools by name.
+ * Use local paths (relative to this file or absolute) — NOT npm/git refs
+ * — because these tools aren't published to npm.
  */
 const KNOWN_CUSTOM_TOOLS: Record<string, string> = {
-	read_full: "npm:@ironin/pi-less-shitty#packages/read-full",
+	read_full: "../../../pi-less-shitty/packages/read-full",
 };
 
 interface SubagentRunConfig {
