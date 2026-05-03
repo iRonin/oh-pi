@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import { createRequire } from "node:module";
 import * as os from "node:os";
 import * as path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import type { RunnerStep, RunnerSubagentStep as SubagentStep } from "./parallel-utils.js";
 import type { ArtifactConfig, ArtifactPaths, MaxOutputConfig, SteerMessage } from "./types.js";
@@ -33,11 +33,16 @@ const KNOWN_BUILTIN_TOOLS = new Set(["read", "bash", "edit", "write", "grep", "f
  * the corresponding --extension flag so the tool is registered at runtime.
  *
  * Add entries here when agents reference custom tools by name.
- * Use local paths (relative to this file or absolute) — NOT npm/git refs
- * — because these tools aren't published to npm.
+ *
+ * Values MUST be absolute filesystem paths because pi's package-manager
+ * resolves relative paths against the subagent's cwd (which can be anywhere),
+ * and 'npm:' / 'git:' refs trigger network installs of packages that aren't
+ * published. We resolve from this file's directory at load time so the path
+ * is stable regardless of where the subagent is launched from.
  */
+const RUNNER_DIR = path.dirname(fileURLToPath(import.meta.url));
 const KNOWN_CUSTOM_TOOLS: Record<string, string> = {
-	read_full: "npm:@ironin/pi-less-shitty#packages/read-full",
+	read_full: path.resolve(RUNNER_DIR, "../../../pi-less-shitty/packages/read-full"),
 };
 
 interface SubagentRunConfig {
