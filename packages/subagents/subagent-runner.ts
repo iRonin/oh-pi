@@ -45,6 +45,27 @@ const KNOWN_CUSTOM_TOOLS: Record<string, string> = {
 	read_full: path.resolve(RUNNER_DIR, "../../../pi-less-shitty/packages/read-full"),
 };
 
+// Module-load sanity check: if any custom tool path doesn't exist on disk, log
+// a loud warning to stderr so the user sees it at pi startup instead of when
+// an agent fails 5 minutes into a real task. We do NOT throw — missing paths
+// only matter when an agent actually requests the tool, and the user might be
+// running with a partial install.
+//
+// Critically: this check runs every time the runner module is loaded, which
+// (under jiti) means once per pi process. If a stale cached version of this
+// file is loaded the printed path will reveal it (the resolved path will be
+// the OLD value), so debugging "async agent says my path is wrong" becomes:
+// just look at the startup line.
+for (const [tool, resolvedPath] of Object.entries(KNOWN_CUSTOM_TOOLS)) {
+	if (!fs.existsSync(path.join(resolvedPath, "package.json"))) {
+		console.error(
+			`[subagents] WARN: KNOWN_CUSTOM_TOOLS["${tool}"] resolved to ${resolvedPath}, ` +
+			`but no package.json found there. Subagents requesting --tools '${tool}' will fail. ` +
+			`If pi was just upgraded, restart pi to pick up the latest subagent-runner.ts.`,
+		);
+	}
+}
+
 interface SubagentRunConfig {
 	id: string;
 	steps: RunnerStep[];
@@ -172,20 +193,20 @@ function runPiStreaming(
 
 function resolvePiPackageRootFallback(): string {
 	// Try to resolve the main entry point and walk up to find the package root
-	const entryPoint = require.resolve("@mariozechner/pi-coding-agent");
+	const entryPoint = require.resolve("@earendil-works/pi-coding-agent");
 	// Entry point is typically /path/to/dist/index.js, so go up to find package root
 	let dir = path.dirname(entryPoint);
 	while (dir !== path.dirname(dir)) {
 		const pkgJsonPath = path.join(dir, "package.json");
 		try {
 			const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"));
-			if (pkg.name === "@mariozechner/pi-coding-agent") {
+			if (pkg.name === "@earendil-works/pi-coding-agent") {
 				return dir;
 			}
 		} catch {}
 		dir = path.dirname(dir);
 	}
-	throw new Error("Could not resolve @mariozechner/pi-coding-agent package root");
+	throw new Error("Could not resolve @earendil-works/pi-coding-agent package root");
 }
 
 async function exportSessionHtml(sessionFile: string, outputDir: string, piPackageRoot?: string): Promise<string> {
