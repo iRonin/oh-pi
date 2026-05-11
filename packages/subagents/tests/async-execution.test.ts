@@ -384,16 +384,16 @@ describe("async execution helpers", () => {
 			artifactConfig: { enabled: false },
 		});
 
-		expect(asyncMocks.resolveSkills).toHaveBeenCalledWith(["ecsc-reviewer"], "/legal/project");
+		expect(asyncMocks.resolveSkillsAsync).toHaveBeenCalledWith(["ecsc-reviewer"], "/legal/project");
 	});
 
-	it("resolves async chain step skills against step cwd, then chain cwd, then context cwd", () => {
+	it("resolves async chain step skills against step cwd, then chain cwd, then context cwd", async () => {
 		const ctx = createCtx();
 		asyncMocks.resolveSubagentModelResolution
 			.mockReturnValueOnce({ model: undefined, source: "agent-default", category: undefined })
 			.mockReturnValueOnce({ model: undefined, source: "agent-default", category: undefined });
 
-		executeAsyncChain("chain-cwd", {
+		await executeAsyncChain("chain-cwd", {
 			chain: [
 				{ agent: "scout", task: "Inspect", cwd: "/legal/project", skill: ["ecsc-reviewer"] },
 				{ agent: "planner", task: "Plan", skill: ["planning"] },
@@ -409,9 +409,9 @@ describe("async execution helpers", () => {
 		});
 
 		// First step uses its own cwd
-		expect(asyncMocks.resolveSkills).toHaveBeenNthCalledWith(1, ["ecsc-reviewer"], "/legal/project");
+		expect(asyncMocks.resolveSkillsAsync).toHaveBeenNthCalledWith(1, ["ecsc-reviewer"], "/legal/project");
 		// Second step falls back to chain-level cwd
-		expect(asyncMocks.resolveSkills).toHaveBeenNthCalledWith(2, ["planning"], "/default/workspace");
+		expect(asyncMocks.resolveSkillsAsync).toHaveBeenNthCalledWith(2, ["planning"], "/default/workspace");
 	});
 
 	it("resolves async single-agent skills against context cwd when no cwd provided", () => {
@@ -428,16 +428,16 @@ describe("async execution helpers", () => {
 		});
 
 		// Should fall back to ctx.cwd
-		expect(asyncMocks.resolveSkills).toHaveBeenCalledWith(["ecsc-reviewer"], ctx.cwd);
+		expect(asyncMocks.resolveSkillsAsync).toHaveBeenCalledWith(["ecsc-reviewer"], ctx.cwd);
 	});
 
-	it("resolves async chain step skills against context cwd when step cwd and chain cwd are both undefined", () => {
+	it("resolves async chain step skills against context cwd when step cwd and chain cwd are both undefined", async () => {
 		const ctx = createCtx();
 		asyncMocks.resolveSubagentModelResolution
 			.mockReturnValueOnce({ model: undefined, source: "agent-default", category: undefined })
 			.mockReturnValueOnce({ model: undefined, source: "agent-default", category: undefined });
 
-		executeAsyncChain("chain-no-cwd", {
+		await executeAsyncChain("chain-no-cwd", {
 			chain: [
 				{ agent: "scout", task: "Inspect", skill: ["ecsc-reviewer"] },
 				{ agent: "planner", task: "Plan", skill: ["planning"] },
@@ -453,7 +453,7 @@ describe("async execution helpers", () => {
 		});
 
 		// Both steps should fall back to ctx.cwd
-		expect(asyncMocks.resolveSkills).toHaveBeenNthCalledWith(1, ["ecsc-reviewer"], ctx.cwd);
-		expect(asyncMocks.resolveSkills).toHaveBeenNthCalledWith(2, ["planning"], ctx.cwd);
+		expect(asyncMocks.resolveSkillsAsync).toHaveBeenNthCalledWith(1, ["ecsc-reviewer"], ctx.cwd);
+		expect(asyncMocks.resolveSkillsAsync).toHaveBeenNthCalledWith(2, ["planning"], ctx.cwd);
 	});
 });
