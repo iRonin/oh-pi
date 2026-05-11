@@ -168,6 +168,8 @@ export interface AsyncStatus {
 		durationMs?: number;
 		tokens?: TokenUsage;
 		skills?: string[];
+		/** Resolved model override for this step (undefined = agent default). */
+		model?: string;
 	}[];
 	sessionDir?: string;
 	outputFile?: string;
@@ -181,6 +183,11 @@ export interface AsyncJobState {
 	status: "queued" | "running" | "complete" | "failed";
 	mode?: "single" | "chain";
 	agents?: string[];
+	/**
+	 * Per-step resolved model. Parallel to `agents`. Entry is undefined when
+	 * the step uses the agent's default model (no explicit override).
+	 */
+	models?: (string | undefined)[];
 	currentStep?: number;
 	stepsTotal?: number;
 	startedAt?: number;

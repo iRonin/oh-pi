@@ -182,7 +182,18 @@ export function renderWidget(
 		const stepText = stepIndex !== undefined ? `step ${stepIndex}/${stepsTotal}` : `steps ${stepsTotal}`;
 		const endTime = job.status === "complete" || job.status === "failed" ? (job.updatedAt ?? Date.now()) : Date.now();
 		const elapsed = job.startedAt ? formatDuration(endTime - job.startedAt) : "";
-		const agentLabel = job.agents ? job.agents.join(" -> ") : (job.mode ?? "single");
+
+		// Pair each agent with its resolved model (if explicitly overridden).
+		// For chains, render "agent[model] -> agent[model]" so the user can see
+		// per-step model choices at a glance in the compacted widget. When the
+		// step uses the agent's default model, the bracketed suffix is omitted.
+		const formatAgentSegment = (agent: string, model: string | undefined): string => {
+			if (!model) return agent;
+			return `${agent}[${theme.fg("dim", model)}]`;
+		};
+		const agentLabel = job.agents
+			? job.agents.map((a, i) => formatAgentSegment(a, job.models?.[i])).join(" -> ")
+			: (job.mode ?? "single");
 
 		const tokenText = job.totalTokens ? ` | ${formatTokens(job.totalTokens.total)} tok` : "";
 		const activityText = job.status === "running" ? getLastActivity(job.outputFile) : "";

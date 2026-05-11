@@ -553,6 +553,8 @@ async function runSubagent(config: SubagentRunConfig): Promise<void> {
 			error?: string;
 			tokens?: TokenUsage;
 			skills?: string[];
+			/** Resolved model override for this step (undefined = agent default). */
+			model?: string;
 		}[];
 		artifactsDir?: string;
 		sessionDir?: string;
@@ -580,6 +582,7 @@ async function runSubagent(config: SubagentRunConfig): Promise<void> {
 			agent: step.agent,
 			status: "pending",
 			skills: step.skills,
+			model: step.model,
 		})),
 		steerCount: 0,
 	};
@@ -637,6 +640,7 @@ async function runSubagent(config: SubagentRunConfig): Promise<void> {
 					agent: newStep.agent,
 					status: "pending",
 					skills: newStep.skills,
+					model: newStep.model,
 				});
 				appendJsonl(
 					eventsPath,

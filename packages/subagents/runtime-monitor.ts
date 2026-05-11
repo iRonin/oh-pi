@@ -71,6 +71,7 @@ export function createSubagentRuntimeMonitor(options: RuntimeMonitorOptions) {
 					job.updatedAt = status.lastUpdate ?? Date.now();
 					if (status.steps?.length) {
 						job.agents = status.steps.map((step) => step.agent);
+						job.models = status.steps.map((step) => step.model);
 					}
 					job.sessionDir = status.sessionDir ?? job.sessionDir;
 					job.outputFile = status.outputFile ?? job.outputFile;
