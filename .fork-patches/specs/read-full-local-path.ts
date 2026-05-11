@@ -23,17 +23,18 @@ export const spec: ForkPatchSpec = {
 	verify(readTarget) {
 		const content = readTarget("packages/subagents/subagent-runner.ts");
 		const failures: string[] = [];
-		// Find the read_full mapping line and check it's a path, not npm:
-		const lineMatch = content.match(/["']read_full["']\s*:\s*([^,\n}]+)/);
-		if (lineMatch) {
-			const value = lineMatch[1];
-			if (/npm:/.test(value)) {
+		// Find the read_full mapping (key may be quoted or bare identifier, value
+		// may be a string literal OR an expression like path.resolve(...))
+		const lineMatch = content.match(/["']?read_full["']?\s*:\s*([^,\n}]+)/);
+		if (!lineMatch) {
+			failures.push("subagent-runner.ts: no read_full entry in KNOWN_CUSTOM_TOOLS map");
+		} else {
+			const value = lineMatch[1].trim();
+			if (/^["'].*npm:/.test(value)) {
 				failures.push(
-					`subagent-runner.ts: read_full mapped to npm specifier (${value.trim()}) — must be local path`,
+					`subagent-runner.ts: read_full mapped to npm specifier (${value}) — must be local filesystem path`,
 				);
 			}
-		} else {
-			failures.push("subagent-runner.ts: no read_full entry in KNOWN_CUSTOM_TOOLS map");
 		}
 		return failures.length === 0 ? { ok: true } : { ok: false, failures };
 	},

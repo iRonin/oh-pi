@@ -31,8 +31,8 @@
  * expansion. If pi ever changes those semantics this verify will continue
  * to pass, so the spec must be revisited on major pi version bumps.
  *
- * Reference commit: 37abe4b — fix(subagents): inline getAgentDir to unbreak
- * async runner on pi v0.74.0+
+ * Reference commit: e7d6961 (post-reconciliation; cherry-picked from 37abe4b) —
+ * fix(subagents): inline getAgentDir to unbreak async runner on pi v0.74.0+
  */
 
 import type { ForkPatchSpec } from "../types.js";
@@ -40,7 +40,7 @@ import type { ForkPatchSpec } from "../types.js";
 export const spec: ForkPatchSpec = {
 	id: "paths-inline-getAgentDir",
 	targets: ["packages/subagents/paths.ts"],
-	referenceCommit: "37abe4bc455c11b5c95fae90a597e01d0bb75026",
+	referenceCommit: "e7d6961b62f9dabe5381c91a408f2a61380402cb",
 
 	intent:
 		"In packages/subagents/paths.ts, the resolveAgentDir() function MUST NOT depend on a bare-specifier import of getAgentDir from @earendil-works/pi-coding-agent (or @mariozechner/pi-coding-agent — either scope). That import is unresolvable when paths.ts is loaded inside a detached child process spawned by the async subagent runner. " +

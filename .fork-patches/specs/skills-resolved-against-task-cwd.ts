@@ -13,11 +13,17 @@ import type { ForkPatchSpec } from "../types.js";
 
 export const spec: ForkPatchSpec = {
 	id: "skills-resolved-against-task-cwd",
-	targets: ["packages/subagents/execution.ts", "packages/subagents/async-execution.ts"],
+	targets: [
+		"packages/subagents/execution.ts",
+		"packages/subagents/async-execution.ts",
+		"packages/subagents/tests/execution.test.ts",
+		"packages/subagents/tests/async-execution.test.ts",
+	],
 	referenceCommit: "19cfd2fef15c21fd5b8d9da187e3f8c89cd3cbda",
 
 	intent:
-		"In both execution.ts (sync) and async-execution.ts (async + chain), skill resolution MUST use the task's cwd (or chain step's cwd, then chain-level cwd) before falling back to the parent ctx.cwd. The argument passed to resolveSkillsAsync MUST be `cwd ?? ctx.cwd` or equivalent — never the parent runtime cwd alone.",
+		"In both execution.ts (sync) and async-execution.ts (async + chain), skill resolution MUST use the task's cwd (or chain step's cwd, then chain-level cwd) before falling back to the parent ctx.cwd. The argument passed to resolveSkillsAsync MUST be `cwd ?? ctx.cwd` or equivalent — never the parent runtime cwd alone. " +
+		"The accompanying test coverage in async-execution.test.ts MUST exercise the per-step cwd resolution (otherwise the dependent `test-cwd-fallback-coverage` patch has no anchor to extend).",
 
 	verify(readTarget) {
 		const failures: string[] = [];
@@ -33,6 +39,24 @@ export const spec: ForkPatchSpec = {
 		// async path: per-step cwd fallback
 		if (!/resolveSkillsAsync\([^)]*\bcwd\b/.test(asyncExec)) {
 			failures.push("async-execution.ts: resolveSkillsAsync not invoked with cwd fallback");
+		}
+		// Test coverage — these test titles establish the anchors that the
+		// dependent `test-cwd-fallback-coverage` patch extends. Without them,
+		// the dependent cherry-pick has no shared context to merge against.
+		try {
+			const asyncTest = readTarget("packages/subagents/tests/async-execution.test.ts");
+			if (!/resolves async single-agent skills against task cwd/.test(asyncTest)) {
+				failures.push(
+					'async-execution.test.ts: missing test "resolves async single-agent skills against task cwd" — prerequisite for test-cwd-fallback-coverage',
+				);
+			}
+			if (!/resolves async chain step skills against step cwd/.test(asyncTest)) {
+				failures.push(
+					'async-execution.test.ts: missing test "resolves async chain step skills against step cwd" — prerequisite for test-cwd-fallback-coverage',
+				);
+			}
+		} catch {
+			failures.push("async-execution.test.ts: file unreadable or missing");
 		}
 
 		return failures.length === 0 ? { ok: true } : { ok: false, failures };
