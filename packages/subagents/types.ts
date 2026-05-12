@@ -157,10 +157,12 @@ export interface ArtifactConfig {
 export interface AsyncStatus {
 	runId: string;
 	mode: "single" | "chain";
-	state: "queued" | "running" | "complete" | "failed";
+	state: "queued" | "running" | "complete" | "failed" | "killed";
 	startedAt: number;
 	endedAt?: number;
 	lastUpdate?: number;
+	/** Worker process PID (set by subagent-runner). Used for liveness reconciliation. */
+	pid?: number;
 	currentStep?: number;
 	steps?: {
 		agent: string;

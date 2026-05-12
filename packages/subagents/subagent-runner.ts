@@ -536,7 +536,7 @@ async function runSubagent(config: SubagentRunConfig): Promise<void> {
 	const statusPayload: {
 		runId: string;
 		mode: "single" | "chain";
-		state: "queued" | "running" | "complete" | "failed";
+		state: "queued" | "running" | "complete" | "failed" | "killed";
 		startedAt: number;
 		endedAt?: number;
 		lastUpdate: number;

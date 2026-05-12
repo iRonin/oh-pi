@@ -18,30 +18,99 @@ import type { AsyncStatus, DisplayItem, ErrorInfo, SteerMailbox, SteerMessage } 
 const statusCache = new Map<string, { mtime: number; status: AsyncStatus }>();
 
 /**
- * Read async job status from disk (with mtime-based caching)
+ * Grace window (ms) for normal worker shutdown — a dead PID combined with a
+ * lastUpdate timestamp newer than this is treated as a race with the worker
+ * writing its final "complete"/"failed" status, not a kill.
+ */
+const LIVENESS_GRACE_MS = 5000;
+
+/**
+ * Reconcile a possibly-stale running status against the worker PID's actual
+ * liveness. If the PID is gone and the status hasn't been touched within the
+ * grace window, mark the run as "killed" and persist atomically.
+ *
+ * Returns the (possibly updated) status. Caller should not assume identity
+ * with the input — a new object is returned on transition.
+ *
+ * Behaviour:
+ *   - state !== "running" → unchanged (terminal states are sticky)
+ *   - no pid (legacy runs) → unchanged
+ *   - process.kill(pid, 0) succeeds → alive, unchanged
+ *   - EPERM → exists but owned by another user, treat as alive
+ *   - ESRCH within grace window → may be racing worker shutdown, unchanged
+ *   - ESRCH outside grace window → killed, persist, return updated
+ */
+export function reconcileLiveness(status: AsyncStatus, statusPath: string): AsyncStatus {
+	if (status.state !== "running") return status;
+	if (typeof status.pid !== "number" || !Number.isFinite(status.pid)) return status;
+
+	try {
+		process.kill(status.pid, 0);
+		return status; // alive
+	} catch (e) {
+		const code = (e as NodeJS.ErrnoException).code;
+		if (code === "EPERM") return status; // exists, owned by another user
+		if (code !== "ESRCH") return status; // unknown error — be conservative
+
+		const lastTouch = status.lastUpdate ?? status.startedAt;
+		if (Date.now() - lastTouch <= LIVENESS_GRACE_MS) {
+			// Worker may be in the middle of writing its terminal state.
+			return status;
+		}
+
+		const updated: AsyncStatus = { ...status, state: "killed", endedAt: Date.now() };
+		try {
+			const tmp = `${statusPath}.${process.pid}.tmp`;
+			fs.writeFileSync(tmp, JSON.stringify(updated, null, 2));
+			fs.renameSync(tmp, statusPath);
+		} catch {
+			// Best-effort persist; caller still gets the updated value in memory.
+		}
+		return updated;
+	}
+}
+
+/**
+ * Read async job status from disk (with mtime-based caching).
+ * Applies liveness reconciliation — if the worker PID is gone and the status
+ * file is stale, the run is transitioned to "killed" and persisted.
  */
 export function readStatus(asyncDir: string): AsyncStatus | null {
 	const statusPath = path.join(asyncDir, "status.json");
+	let status: AsyncStatus;
 	try {
 		const stat = fs.statSync(statusPath);
 		const cached = statusCache.get(statusPath);
 		if (cached && cached.mtime === stat.mtimeMs) {
-			return cached.status;
-		}
-		const content = fs.readFileSync(statusPath, "utf8");
-		const status = JSON.parse(content) as AsyncStatus;
-		statusCache.set(statusPath, { mtime: stat.mtimeMs, status });
-		// Limit cache size to prevent memory leaks
-		if (statusCache.size > 50) {
-			const firstKey = statusCache.keys().next().value;
-			if (firstKey) {
-				statusCache.delete(firstKey);
+			status = cached.status;
+		} else {
+			const content = fs.readFileSync(statusPath, "utf8");
+			status = JSON.parse(content) as AsyncStatus;
+			statusCache.set(statusPath, { mtime: stat.mtimeMs, status });
+			// Limit cache size to prevent memory leaks
+			if (statusCache.size > 50) {
+				const firstKey = statusCache.keys().next().value;
+				if (firstKey) {
+					statusCache.delete(firstKey);
+				}
 			}
 		}
-		return status;
 	} catch {
 		return null;
 	}
+
+	const reconciled = reconcileLiveness(status, statusPath);
+	if (reconciled !== status) {
+		// Atomic rename above changed the file mtime; refresh the cache so the
+		// in-memory copy matches what's on disk.
+		try {
+			const stat = fs.statSync(statusPath);
+			statusCache.set(statusPath, { mtime: stat.mtimeMs, status: reconciled });
+		} catch {
+			statusCache.delete(statusPath);
+		}
+	}
+	return reconciled;
 }
 
 // Cache for output tail reads - avoid re-reading unchanged files

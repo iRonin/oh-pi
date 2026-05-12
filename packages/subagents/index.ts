@@ -239,7 +239,7 @@ function handleSteerAction(
 
 	// Check if the run is still active
 	const status = readStatus(asyncDir);
-	if (status?.state === "complete" || status?.state === "failed") {
+	if (status?.state === "complete" || status?.state === "failed" || status?.state === "killed") {
 		return {
 			content: [{ type: "text", text: `Async run ${id.slice(0, 6)} is ${status.state} — cannot steer completed runs` }],
 			isError: true,
@@ -1251,15 +1251,17 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 					const started = new Date(status.startedAt).toISOString();
 					const updated = status.lastUpdate ? new Date(status.lastUpdate).toISOString() : "n/a";
 
+					const stateDisplay = status.state === "killed" ? "killed (process gone)" : status.state;
 					const lines = [
 						`Run: ${status.runId}`,
-						`State: ${status.state}`,
+						`State: ${stateDisplay}`,
 						`Mode: ${status.mode}`,
 						stepLine,
 						`Started: ${started}`,
 						`Updated: ${updated}`,
 						`Dir: ${asyncDir}`,
 					];
+					if (typeof status.pid === "number") lines.push(`Pid: ${status.pid}`);
 					if (status.sessionFile) lines.push(`Session: ${status.sessionFile}`);
 					// Sharing disabled - session file path shown above
 					if (fs.existsSync(logPath)) lines.push(`Log: ${logPath}`);
