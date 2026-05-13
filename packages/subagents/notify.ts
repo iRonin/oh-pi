@@ -3,8 +3,25 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import * as child_process from "node:child_process";
 
 import { buildCompletionKey, getGlobalSeenMap, markSeenWithTtl } from "./completion-dedupe.js";
+
+/**
+ * Play a soft ding when an async subagent finishes.
+ * Ping.aiff + terminal bell.
+ */
+function agentDoneSound(): void {
+	process.stdout.write("\x07");
+	try {
+		const child = child_process.spawn(
+			"/usr/bin/afplay",
+			["/System/Library/Sounds/Ping.aiff"],
+			{ detached: true, stdio: "ignore" },
+		);
+		child.unref();
+	} catch {}
+}
 
 interface ChainStepResult {
 	agent: string;
@@ -39,6 +56,10 @@ export default function registerSubagentNotify(pi: ExtensionAPI): void {
 		if (markSeenWithTtl(seen, key, now, ttlMs)) {
 			return;
 		}
+
+		// Play attention sound — this is the ONLY place it fires,
+		// so users get notified when a background task actually finishes.
+		agentDoneSound();
 
 		const agent = result.agent ?? "unknown";
 		const status = result.success ? "completed" : "failed";
