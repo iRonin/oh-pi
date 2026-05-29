@@ -42,10 +42,11 @@ Customizations that landed after the 2026-05-11 reconciliation baseline.
 |---|---|---|---|
 | `artifact-path-wrapping` | `d8651fb` | feat/all-local d8651fb | ✅ full verify |
 | `temp-dir-migration-guard` | `34c7716` | feat/all-local 34c7716 | ✅ full verify |
+| `killed-job-overlay-cleanup` | `0a89edb` | feat/all-local 0a89edb | ✅ full verify |
 
 > Known spec gaps (fork commits not yet cataloged): `8c1bc6d` (completion
 > sound on `subagent:complete`), `00cd517` (PID-liveness reconcile for killed
-> async workers).
+> async workers). Note: `killed-job-overlay-cleanup` builds on `00cd517`.
 
 ## Commits explicitly dropped during reconciliation
 
