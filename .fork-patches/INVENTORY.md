@@ -34,6 +34,19 @@ commits (DEBUG_SUBAGENT add + revert), and added the previously stranded
 | `widget-per-step-model` | `036d7fa` | feat/all-local 1ee7be8 | stub |
 | `subagents-harness-package` | `f652181` | origin/feat/all-local 568073e | stub |
 
+## Post-merge specs (2026-05-29, after upstream merge `e7e1184`)
+
+Customizations that landed after the 2026-05-11 reconciliation baseline.
+
+| Spec id | Reference commit | Source provenance | Status |
+|---|---|---|---|
+| `artifact-path-wrapping` | `d8651fb` | feat/all-local d8651fb | ✅ full verify |
+| `temp-dir-migration-guard` | `34c7716` | feat/all-local 34c7716 | ✅ full verify |
+
+> Known spec gaps (fork commits not yet cataloged): `8c1bc6d` (completion
+> sound on `subagent:complete`), `00cd517` (PID-liveness reconcile for killed
+> async workers).
+
 ## Commits explicitly dropped during reconciliation
 
 ### Pre-reconciliation `feat/all-local` (17 → 13 preserved, 2 dropped, 2 subsumed)
