@@ -167,6 +167,30 @@ describe("subagent async widget rendering", () => {
 		expect(ctx._setWidget.mock.calls.length).toBe(callsBefore + 1);
 	});
 
+	it("renders killed jobs as 'killed' (not 'running') and shows no live tail", () => {
+		const ctx = createCtx();
+		renderWidget(ctx as never, [
+			{
+				asyncId: "kill12",
+				asyncDir: "/tmp/run",
+				status: "killed",
+				mode: "single",
+				agents: ["scout"],
+				updatedAt: Date.now(),
+				startedAt: Date.now() - 1000,
+				outputFile: "/tmp/out.log",
+			},
+		]);
+		const joined = (ctx._widgets.get(WIDGET_KEY) as string[]).join("\n");
+		// Intent: a killed worker must be visibly distinguished as terminal,
+		// never mislabeled as still running (the stuck-overlay bug).
+		expect(joined).toContain("killed");
+		expect(joined).not.toContain("running");
+		// A terminal job must not stream live activity/output tail.
+		expect(joined).not.toContain("recent activity");
+		expect(joined).not.toContain("line a");
+	});
+
 	it("wraps running debug tail lines while keeping the status header truncated", () => {
 		const originalColumns = process.stdout.columns;
 		process.stdout.columns = 30;

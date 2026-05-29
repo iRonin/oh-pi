@@ -287,8 +287,28 @@ export default function registerSubagentExtension(pi: ExtensionAPI): void {
 		getCurrentSessionId: () => currentSessionId,
 		getLastUiContext: () => lastUiContext,
 		getSafeModeEnabled: () => safeModeEnabled,
+		onJobTerminal: scheduleJobRemoval,
 		pi,
 	});
+
+	// Drop a finished async job from the overlay after a short grace period.
+	// Shared by the subagent:complete handler and the runtime monitor's
+	// killed-worker detection (a killed worker writes no result file, so it never
+	// emits subagent:complete). Hoisted function declaration so it can be passed
+	// as onJobTerminal above. Idempotent: keeps the original window if re-called.
+	function scheduleJobRemoval(asyncId: string): void {
+		if (cleanupTimers.has(asyncId)) {
+			return;
+		}
+		const timer = setTimeout(() => {
+			cleanupTimers.delete(asyncId);
+			asyncJobs.delete(asyncId);
+			if (lastUiContext) {
+				runtimeMonitor.refreshWidget();
+			}
+		}, 10_000);
+		cleanupTimers.set(asyncId, timer);
+	}
 	const getAvailableRoutingModels = (ctx: ExtensionContext): ModelInfo[] =>
 		toAvailableModelRefs(
 			ctx.modelRegistry.getAvailable().map((model) => ({
@@ -1498,15 +1518,8 @@ MANAGEMENT (use action field — omit agent/task/chain/tasks):
 		if (lastUiContext) {
 			runtimeMonitor.refreshWidget();
 		}
-		// Schedule cleanup after 10 seconds (track timer for cleanup on shutdown)
-		const timer = setTimeout(() => {
-			cleanupTimers.delete(asyncId);
-			asyncJobs.delete(asyncId);
-			if (lastUiContext) {
-				runtimeMonitor.refreshWidget();
-			}
-		}, 10_000);
-		cleanupTimers.set(asyncId, timer);
+		// Remove from the overlay after a short grace period.
+		scheduleJobRemoval(asyncId);
 	});
 
 	pi.on("tool_result", (event, ctx) => {

@@ -182,7 +182,7 @@ export interface AsyncStatus {
 export interface AsyncJobState {
 	asyncId: string;
 	asyncDir: string;
-	status: "queued" | "running" | "complete" | "failed";
+	status: "queued" | "running" | "complete" | "failed" | "killed";
 	mode?: "single" | "chain";
 	agents?: string[];
 	/**

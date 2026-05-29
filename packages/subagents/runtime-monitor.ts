@@ -18,6 +18,12 @@ interface RuntimeMonitorOptions {
 	getCurrentSessionId: () => string | null;
 	getLastUiContext: () => ExtensionContext | null;
 	getSafeModeEnabled: () => boolean;
+	/**
+	 * Called once when a job reaches a terminal state that the result-file
+	 * watcher won't observe (a killed worker writes no result file). Wired to
+	 * the same delayed overlay cleanup used by the subagent:complete path.
+	 */
+	onJobTerminal: (asyncId: string) => void;
 }
 
 export function createSubagentRuntimeMonitor(options: RuntimeMonitorOptions) {
@@ -58,7 +64,7 @@ export function createSubagentRuntimeMonitor(options: RuntimeMonitorOptions) {
 			}
 
 			for (const job of options.asyncJobs.values()) {
-				if (job.status === "complete" || job.status === "failed") {
+				if (job.status === "complete" || job.status === "failed" || job.status === "killed") {
 					continue;
 				}
 				const status = readStatus(job.asyncDir);
@@ -78,6 +84,13 @@ export function createSubagentRuntimeMonitor(options: RuntimeMonitorOptions) {
 					job.totalTokens = status.totalTokens ?? job.totalTokens;
 					job.sessionFile = status.sessionFile ?? job.sessionFile;
 					job.pendingSteers = status.steerCount ?? 0;
+					// readStatus()/reconcileLiveness flips a vanished worker to "killed".
+					// Such a worker wrote no result file, so subagent:complete never
+					// fires — signal terminal cleanup here so the row doesn't stick.
+					// The top-of-loop skip guarantees this runs at most once per job.
+					if (status.state === "killed") {
+						options.onJobTerminal(job.asyncId);
+					}
 				} else {
 					job.status = job.status === "queued" ? "running" : job.status;
 					job.updatedAt = Date.now();

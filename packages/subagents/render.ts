@@ -175,12 +175,17 @@ export function renderWidget(
 				? theme.fg("success", "complete")
 				: job.status === "failed"
 					? theme.fg("error", "failed")
-					: theme.fg("warning", "running");
+					: job.status === "killed"
+						? theme.fg("error", "killed")
+						: theme.fg("warning", "running");
 
 		const stepsTotal = job.stepsTotal ?? job.agents?.length ?? 1;
 		const stepIndex = job.currentStep !== undefined ? job.currentStep + 1 : undefined;
 		const stepText = stepIndex !== undefined ? `step ${stepIndex}/${stepsTotal}` : `steps ${stepsTotal}`;
-		const endTime = job.status === "complete" || job.status === "failed" ? (job.updatedAt ?? Date.now()) : Date.now();
+		const endTime =
+			job.status === "complete" || job.status === "failed" || job.status === "killed"
+				? (job.updatedAt ?? Date.now())
+				: Date.now();
 		const elapsed = job.startedAt ? formatDuration(endTime - job.startedAt) : "";
 
 		// Pair each agent with its resolved model (if explicitly overridden).
