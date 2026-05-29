@@ -5,6 +5,7 @@ import {
 	resolvePiAgentDir,
 } from "@ifi/oh-pi-core";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 
 export type ProjectAgentStorageMode = "shared" | "project";
@@ -129,9 +130,21 @@ Best-effort migration for legacy repo-local project agents. When shared mode is 
 
 <!-- {/subagentsMigrateLegacyProjectAgentsDocs} -->
 */
+/** Skip migration for temp directories — test fixtures under /var/folders should never pollute shared storage. */
+function isTempDirectory(dir: string): boolean {
+	// Allow test override via env var
+	if (process.env.__PI_SUBAGENT_BYPASS_TEMP_CHECK) return false;
+	const resolved = path.resolve(dir);
+	const tmp = os.tmpdir();
+	return resolved.startsWith(tmp + path.sep) || resolved === tmp;
+}
+
 export function migrateLegacyProjectAgents(cwd: string, options?: ProjectAgentStorageOptions): void {
 	const resolved = resolveProjectAgentStorageOptions(options);
 	if (resolved.mode !== "shared") {
+		return;
+	}
+	if (isTempDirectory(cwd)) {
 		return;
 	}
 

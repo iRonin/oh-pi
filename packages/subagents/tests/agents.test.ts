@@ -10,6 +10,7 @@ const tempDirs: string[] = [];
 let savedHome: string | undefined;
 let savedUserProfile: string | undefined;
 let savedProjectAgentsMode: string | undefined;
+let savedBypassTempCheck: string | undefined;
 
 function unsetEnv(key: keyof NodeJS.ProcessEnv): void {
 	Reflect.deleteProperty(process.env, key);
@@ -31,6 +32,7 @@ beforeEach(() => {
 	savedHome = process.env.HOME;
 	savedUserProfile = process.env.USERPROFILE;
 	savedProjectAgentsMode = process.env.PI_SUBAGENT_PROJECT_AGENTS_MODE;
+	savedBypassTempCheck = process.env.__PI_SUBAGENT_BYPASS_TEMP_CHECK;
 });
 
 afterEach(() => {
@@ -50,6 +52,12 @@ afterEach(() => {
 		unsetEnv("PI_SUBAGENT_PROJECT_AGENTS_MODE");
 	} else {
 		process.env.PI_SUBAGENT_PROJECT_AGENTS_MODE = savedProjectAgentsMode;
+	}
+
+	if (savedBypassTempCheck === undefined) {
+		unsetEnv("__PI_SUBAGENT_BYPASS_TEMP_CHECK");
+	} else {
+		process.env.__PI_SUBAGENT_BYPASS_TEMP_CHECK = savedBypassTempCheck;
 	}
 
 	while (tempDirs.length > 0) {
@@ -173,6 +181,7 @@ describe("discoverAgents", () => {
 		process.env.HOME = homeDir;
 		process.env.USERPROFILE = homeDir;
 		process.env.PI_SUBAGENT_PROJECT_AGENTS_MODE = "shared";
+		process.env.__PI_SUBAGENT_BYPASS_TEMP_CHECK = "1"; // allow migration from temp dir for testing
 
 		writeAgentFile(
 			projectDir,
