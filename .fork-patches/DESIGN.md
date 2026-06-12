@@ -1,6 +1,6 @@
 # oh-pi fork-patches — design
 
-Mirror of the `pi-less-shitty/packages/patch-applier` model, adapted for a
+Mirror of the `pi-bakery/packages/patch-applier` model, adapted for a
 **source-tree fork** instead of an installed npm dist.
 
 ## Why this exists
@@ -10,7 +10,7 @@ all our customizations, so the fork carries persistent local patches. Without
 a discipline, `feat/all-local` drifts unboundedly from `upstream/main` and
 upstream sync becomes a quarterly archaeology project.
 
-The pi-less-shitty patch-applier solves this for installed dist files by
+The pi-bakery patch-applier solves this for installed dist files by
 making each patch a **durable spec** (intent + verify) with text edits
 re-derived by an AI agent against the current dist. We do the same for oh-pi,
 but the apply target is the source tree of `feat/all-local` rebuilt from
@@ -72,12 +72,12 @@ type VerifyResult = { ok: true } | { ok: false; failures: string[] };
    (the script never force-pushes — leaves that to the human)
 6. On failure: leave `sync-staging` for inspection, report which spec failed
 
-This mirrors pi-less-shitty's `staged-upgrade.sh` flow: stage → apply → verify
+This mirrors pi-bakery's `staged-upgrade.sh` flow: stage → apply → verify
 → smoke test → atomic swap is gated by human review.
 
 ## Why git cherry-pick first, AI second
 
-For pi-less-shitty the apply target is a built `.js` dist — the AI is the only
+For pi-bakery the apply target is a built `.js` dist — the AI is the only
 realistic option because the dist shape changes every npm release. For oh-pi
 the apply target is a versioned **source tree** with full git history, so
 cherry-pick is the natural primitive when upstream hasn't touched the same

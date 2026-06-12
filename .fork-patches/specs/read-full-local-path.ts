@@ -18,7 +18,7 @@ export const spec: ForkPatchSpec = {
 	referenceCommit: "d268f3dda5e0fc71051aad4b226a629114b48919",
 
 	intent:
-		"The KNOWN_CUSTOM_TOOLS entry for `read_full` MUST point at a local filesystem path under pi-less-shitty's read-full package, not an npm specifier.",
+		"The KNOWN_CUSTOM_TOOLS entry for `read_full` MUST point at a local filesystem path under pi-bakery's read-full package, not an npm specifier.",
 
 	verify(readTarget) {
 		const content = readTarget("packages/subagents/subagent-runner.ts");

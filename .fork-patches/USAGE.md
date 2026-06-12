@@ -1,7 +1,7 @@
 # oh-pi fork-patches — usage
 
 Tooling to keep `feat/all-local` reconciled with `upstream/main` while
-preserving 15 local customizations. Mirror of pi-less-shitty's
+preserving 15 local customizations. Mirror of pi-bakery's
 `staged-upgrade.sh` flow.
 
 ## Quick reference
@@ -15,13 +15,13 @@ npx tsx .fork-patches/cli.ts --check
 npx tsx .fork-patches/cli.ts --list
 
 # Full sync: stage → cherry-pick → AI fallback → verify → smoke test
-~/Work/Pi-Agent/pi-less-shitty/scripts/oh-pi-staged-upgrade.sh
+~/Work/Pi-Agent/pi-bakery/scripts/oh-pi-staged-upgrade.sh
 
 # Show what the upgrade would do without writing
-~/Work/Pi-Agent/pi-less-shitty/scripts/oh-pi-staged-upgrade.sh --dry-run
+~/Work/Pi-Agent/pi-bakery/scripts/oh-pi-staged-upgrade.sh --dry-run
 
 # Skip the vitest step (much faster, useful for iterating on specs)
-~/Work/Pi-Agent/pi-less-shitty/scripts/oh-pi-staged-upgrade.sh --no-tests
+~/Work/Pi-Agent/pi-bakery/scripts/oh-pi-staged-upgrade.sh --no-tests
 ```
 
 ## Architecture
@@ -54,7 +54,7 @@ npx tsx .fork-patches/cli.ts --list
     ├── verbose-call-params-render.ts
     └── widget-per-step-model.ts
 
-~/Work/Pi-Agent/pi-less-shitty/scripts/
+~/Work/Pi-Agent/pi-bakery/scripts/
 └── oh-pi-staged-upgrade.sh      end-to-end orchestrator
 ```
 
@@ -121,7 +121,7 @@ After:
 
 4. Run the full upgrade end-to-end to confirm the replay reproduces the
    patch atop a fresh upstream/main:
-   `~/Work/Pi-Agent/pi-less-shitty/scripts/oh-pi-staged-upgrade.sh --no-tests`
+   `~/Work/Pi-Agent/pi-bakery/scripts/oh-pi-staged-upgrade.sh --no-tests`
 
 5. Commit the new spec to `feat/all-local`. Update `INVENTORY.md`.
 
@@ -177,9 +177,9 @@ natively. Remove the spec from `.fork-patches/specs/`, document in
 npx tsx .fork-patches/cli.ts --apply --spec <id> --repo <staging-or-clone>
 ```
 
-## How this differs from pi-less-shitty's patch-applier
+## How this differs from pi-bakery's patch-applier
 
-pi-less-shitty patches the **installed dist** of pi (built JS files in
+pi-bakery patches the **installed dist** of pi (built JS files in
 `/opt/homebrew/lib/...`). Each upgrade replaces the dist entirely, so
 the patcher's only viable mechanism is AI text-edit re-derivation.
 

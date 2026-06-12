@@ -2,9 +2,9 @@
 
 Persistent local customizations for `iRonin/oh-pi` (a fork of `ifiokjr/oh-pi`).
 
-Mirrors the design of `pi-less-shitty/packages/patch-applier/`, adapted from
+Mirrors the design of `pi-bakery/packages/patch-applier/`, adapted from
 binary dist patching to source-tree patching:
-- pi-less-shitty patches a built `.js` dist (single mechanism: AI text edits)
+- pi-bakery patches a built `.js` dist (single mechanism: AI text edits)
 - oh-pi patches a versioned source tree (two mechanisms: `git cherry-pick` first,
   AI re-derivation only on conflict)
 

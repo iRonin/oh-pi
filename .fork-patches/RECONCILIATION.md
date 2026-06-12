@@ -72,7 +72,7 @@ The `feat/all-local` branch was rebased onto the latest `upstream/main`
 
 ## What's next
 
-The applier driver (analog of `pi-less-shitty/packages/patch-applier/`'s
+The applier driver (analog of `pi-bakery/packages/patch-applier/`'s
 `staged-upgrade.sh`) is **not yet implemented**. Today's reconciliation was
 manual `git cherry-pick`. The specs are scaffolded for a future agent to:
 

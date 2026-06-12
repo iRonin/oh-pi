@@ -42,7 +42,7 @@ const KNOWN_BUILTIN_TOOLS = new Set(["read", "bash", "edit", "write", "grep", "f
  */
 const RUNNER_DIR = path.dirname(fileURLToPath(import.meta.url));
 const KNOWN_CUSTOM_TOOLS: Record<string, string> = {
-	read_full: path.resolve(RUNNER_DIR, "../../../pi-less-shitty/packages/read-full"),
+	read_full: path.resolve(RUNNER_DIR, "../../../pi-bakery/packages/read-full"),
 };
 
 // Module-load sanity check: if any custom tool path doesn't exist on disk, log

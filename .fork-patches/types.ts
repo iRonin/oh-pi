@@ -1,7 +1,7 @@
 /**
  * ForkPatchSpec — durable description of a single fork customization.
  *
- * Adapted from pi-less-shitty/packages/patch-applier/src/types.ts. Differences:
+ * Adapted from pi-bakery/packages/patch-applier/src/types.ts. Differences:
  *  - target → targets[]: source patches frequently touch multiple files (tests
  *    + source + types)
  *  - referenceCommit: the canonical commit on the fork that demonstrates the

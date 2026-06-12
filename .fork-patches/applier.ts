@@ -1,7 +1,7 @@
 /**
  * oh-pi fork-patch applier — cherry-pick first, AI re-derivation on conflict.
  *
- * Different from pi-less-shitty's patch-applier (which patches installed dist
+ * Different from pi-bakery's patch-applier (which patches installed dist
  * files): we work against a **git source tree** we control. The natural
  * primitive is `git cherry-pick <spec.referenceCommit>`. AI re-derivation
  * (delegating to a fresh `pi` subprocess) only kicks in when cherry-pick
